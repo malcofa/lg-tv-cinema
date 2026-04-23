@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=1920, user-scalable=no">
+  <title>Cinema Clásico</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Splash / Loading -->
+  <div id="splash" class="screen active">
+    <div class="splash-content">
+      <h1 class="logo">CINEMA <span>CLÁSICO</span></h1>
+      <div class="loader"></div>
+      <p id="splash-status">Cargando catálogo...</p>
+    </div>
+  </div>
+
+  <!-- Home: Hero + Grilla -->
+  <div id="home" class="screen">
+    <header class="top-bar">
+      <h1 class="brand">CINEMA <span>CLÁSICO</span></h1>
+      <div class="top-actions">
+        <button class="top-btn" data-nav="refresh">↻ Refrescar</button>
+        <span id="updated-at" class="updated"></span>
+      </div>
+    </header>
+
+    <section id="hero" class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-gradient"></div>
+      <div class="hero-content">
+        <p class="hero-tagline"></p>
+        <h2 class="hero-title"></h2>
+        <div class="hero-meta"></div>
+        <p class="hero-synopsis"></p>
+        <div class="hero-actions">
+          <button class="btn-primary" data-nav="hero-play">▶ Reproducir</button>
+          <button class="btn-secondary" data-nav="hero-info">+ Más información</button>
+        </div>
+      </div>
+    </section>
+
+    <main id="categories" class="categories"></main>
+  </div>
+
+  <!-- Detalle de película -->
+  <div id="detail" class="screen">
+    <div class="detail-bg"></div>
+    <div class="detail-gradient"></div>
+    <button class="back-btn" data-nav="detail-back">← Volver</button>
+    <div class="detail-content">
+      <h2 class="detail-title"></h2>
+      <div class="detail-meta"></div>
+      <p class="detail-tagline"></p>
+      <p class="detail-synopsis"></p>
+      <div class="detail-info"></div>
+      <div class="detail-actions">
+        <button class="btn-primary" data-nav="detail-play">▶ Reproducir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Player -->
+  <div id="player" class="screen">
+    <video id="video" preload="metadata"></video>
+    <div id="player-overlay" class="player-overlay">
+      <button class="back-btn" data-nav="player-back">← Volver</button>
+      <div class="player-info">
+        <h3 id="player-title"></h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error toast -->
+  <div id="error-toast" class="toast">
+    <p id="error-msg"></p>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

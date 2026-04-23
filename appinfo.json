@@ -1,0 +1,16 @@
+{
+  "id": "com.malcofa.cinema",
+  "version": "1.0.0",
+  "vendor": "malcofa",
+  "type": "web",
+  "main": "index.html",
+  "title": "Cinema Clásico",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "red",
+  "resolution": "1920x1080",
+  "splashBackground": "splash.png",
+  "requiredPermissions": ["internet"],
+  "disableBackHistoryAPI": true,
+  "supportTouchMode": "virtual"
+}

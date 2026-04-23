@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Helper — Cinema Clásico</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0a0a0f; color: #eee; margin: 0; padding: 20px; min-height: 100vh; }
+  h1 { color: #e50914; margin: 0 0 4px; }
+  .sub { color: #888; margin-bottom: 24px; }
+  .container { max-width: 960px; margin: 0 auto; }
+  .card { background: #16161f; padding: 20px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #222; }
+  label { display: block; font-size: 13px; color: #aaa; margin-bottom: 4px; }
+  input, textarea, select { width: 100%; padding: 10px; background: #0a0a0f; color: #fff; border: 1px solid #333; border-radius: 4px; font-size: 14px; font-family: inherit; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: #e50914; }
+  textarea { resize: vertical; font-family: ui-monospace, Consolas, monospace; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  button { background: #e50914; color: #fff; border: 0; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  button:hover { background: #c30810; }
+  button.secondary { background: #333; }
+  button.secondary:hover { background: #444; }
+  .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; max-height: 400px; overflow-y: auto; }
+  .result { cursor: pointer; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #0a0a0f; }
+  .result:hover { border-color: #e50914; }
+  .result img { width: 100%; display: block; aspect-ratio: 2/3; object-fit: cover; }
+  .result .info { padding: 8px; font-size: 12px; }
+  .result .info .t { font-weight: 700; }
+  .result .info .y { color: #888; }
+  pre { background: #000; padding: 16px; border-radius: 4px; overflow-x: auto; font-size: 12px; color: #7cfc00; max-height: 500px; overflow-y: auto; }
+  .hint { font-size: 12px; color: #888; margin-top: 6px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #e50914; color: #fff; padding: 12px 20px; border-radius: 4px; opacity: 0; transform: translateY(10px); transition: .3s; pointer-events: none; }
+  .toast.v { opacity: 1; transform: translateY(0); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: #aaa; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎬 Helper JSON — Cinema Clásico</h1>
+  <p class="sub">Busca metadata en TMDB y genera el bloque JSON listo para pegar al Gist.</p>
+
+  <div class="card">
+    <label>API Key de TMDB (se guarda en este navegador)</label>
+    <input id="tmdb-key" placeholder="v3 API key — sacala de https://www.themoviedb.org/settings/api">
+    <p class="hint">Crear cuenta gratis en TMDB → Settings → API → Developer. Solo hace falta una vez.</p>
+  </div>
+
+  <div class="card">
+    <label>1. Buscar película en TMDB</label>
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <input id="search-q" placeholder="Ej: Battleship Potemkin" style="flex:1">
+      <select id="search-lang" style="width:120px">
+        <option value="es-ES">Español</option>
+        <option value="en-US">English</option>
+      </select>
+      <button onclick="doSearch()">Buscar</button>
+    </div>
+    <div id="results" class="results"></div>
+  </div>
+
+  <div class="card">
+    <label>2. URL del video (la que te pasó tu familiar)</label>
+    <input id="video-url" placeholder="https://archive.org/download/.../peli.mp4">
+    <p class="hint">Formatos soportados por webOS: MP4 (H.264/AAC), HLS (.m3u8), MKV limitado.</p>
+
+    <div class="row-3" style="margin-top:12px">
+      <div>
+        <label>Calidad</label>
+        <select id="quality">
+          <option value="">(sin especificar)</option>
+          <option>480p</option>
+          <option>720p</option>
+          <option>1080p</option>
+          <option>4K</option>
+        </select>
+      </div>
+      <div>
+        <label>Peso aprox (GB)</label>
+        <input id="size-gb" type="number" step="0.1" placeholder="1.5">
+      </div>
+      <div>
+        <label>Categoría</label>
+        <input id="category" placeholder="Clásicos mudos">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Fuente / hosting</label>
+        <input id="source" placeholder="Internet Archive / pCloud Tío Juan / ...">
+      </div>
+      <div>
+        <label>Agregada por</label>
+        <input id="added-by" placeholder="Tío Juan">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Idioma</label>
+        <input id="language" placeholder="Silente / Español / Inglés">
+      </div>
+      <div>
+        <label>Subtítulos (separados por coma)</label>
+        <input id="subtitles" placeholder="es, en">
+      </div>
+    </div>
+
+    <div>
+      <label><input type="checkbox" id="featured"> Destacada (aparece en el Hero rotatorio)</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>3. Bloque JSON generado</label>
+    <pre id="output">Seleccioná una película de los resultados de arriba y completá la URL del video.</pre>
+    <div style="display:flex; gap:8px; margin-top:8px">
+      <button onclick="copyOutput()">📋 Copiar al portapapeles</button>
+      <button class="secondary" onclick="regenerate()">↻ Regenerar</button>
+    </div>
+    <details>
+      <summary>¿Cómo lo pego al Gist?</summary>
+      <ol style="color:#bbb; font-size:13px; line-height:1.7">
+        <li>Abrí tu Gist de catálogo en <code>gist.github.com</code></li>
+        <li>Click en "Edit"</li>
+        <li>Dentro del array <code>"movies": [ ... ]</code>, pegá el bloque (recordá agregar una coma antes si ya hay otras pelis)</li>
+        <li>Actualizá <code>"updated_at"</code> con la fecha de hoy</li>
+        <li>Click "Update gist"</li>
+        <li>En la TV, tocá "↻ Refrescar" (o cerrá y abrí la app). Aparece la nueva peli.</li>
+      </ol>
+    </details>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const KEY_STORAGE = 'tmdb_api_key';
+let selected = null;
+
+document.getElementById('tmdb-key').value = localStorage.getItem(KEY_STORAGE) || '';
+document.getElementById('tmdb-key').addEventListener('change', e => {
+  localStorage.setItem(KEY_STORAGE, e.target.value.trim());
+});
+
+document.getElementById('search-q').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+['video-url','quality','size-gb','category','source','added-by','language','subtitles','featured']
+  .forEach(id => document.getElementById(id).addEventListener('input', regenerate));
+document.getElementById('featured').addEventListener('change', regenerate);
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('v');
+  setTimeout(() => t.classList.remove('v'), 2000);
+}
+
+async function doSearch() {
+  const key = document.getElementById('tmdb-key').value.trim();
+  const q = document.getElementById('search-q').value.trim();
+  const lang = document.getElementById('search-lang').value;
+  if (!key) return toast('Pegá tu API key de TMDB primero');
+  if (!q) return toast('Ingresá algo que buscar');
+
+  const url = `https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(q)}&language=${lang}&include_adult=false`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    renderResults(data.results || []);
+  } catch (e) {
+    toast('Error: ' + e.message);
+  }
+}
+
+function renderResults(list) {
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  if (list.length === 0) { el.innerHTML = '<p style="color:#888">Sin resultados.</p>'; return; }
+  list.slice(0, 24).forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'result';
+    const poster = m.poster_path ? `https://image.tmdb.org/t/p/w300${m.poster_path}` : '';
+    div.innerHTML = `
+      ${poster ? `<img src="${poster}">` : '<div style="aspect-ratio:2/3;background:#222;display:flex;align-items:center;justify-content:center;color:#555">🎬</div>'}
+      <div class="info">
+        <div class="t">${escapeHtml(m.title)}</div>
+        <div class="y">${(m.release_date || '').slice(0,4)} · ★ ${m.vote_average || '-'}</div>
+      </div>`;
+    div.onclick = () => selectMovie(m);
+    el.appendChild(div);
+  });
+}
+
+async function selectMovie(m) {
+  const key = document.getElementById('tmdb-key').value.trim();
+  const lang = document.getElementById('search-lang').value;
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${m.id}?api_key=${key}&language=${lang}&append_to_response=credits`);
+    const full = await res.json();
+    selected = full;
+    toast('Cargada: ' + full.title);
+    regenerate();
+  } catch (e) {
+    toast('Error: ' + e.message);
+  }
+}
+
+function slugify(s) {
+  return (s || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 50);
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function regenerate() {
+  if (!selected) return;
+  const m = selected;
+  const year = parseInt((m.release_date || '').slice(0,4), 10) || null;
+  const id = slugify(m.title) + (year ? '-' + year : '');
+  const director = (m.credits && m.credits.crew || []).find(c => c.job === 'Director');
+  const subs = document.getElementById('subtitles').value.split(',').map(s => s.trim()).filter(Boolean);
+
+  const obj = {
+    id,
+    title: m.title,
+    original_title: m.original_title !== m.title ? m.original_title : undefined,
+    year,
+    duration_min: m.runtime || null,
+    director: director ? director.name : null,
+    country: (m.production_countries || []).map(c => c.name).join(', ') || null,
+    language: document.getElementById('language').value || null,
+    subtitles: subs.length ? subs : undefined,
+    genres: (m.genres || []).map(g => g.name),
+    category: document.getElementById('category').value || null,
+    rating: m.vote_average ? Math.round(m.vote_average * 10) / 10 : null,
+    quality: document.getElementById('quality').value || null,
+    size_gb: parseFloat(document.getElementById('size-gb').value) || null,
+    synopsis: m.overview || '',
+    tagline: m.tagline || null,
+    poster_url: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : null,
+    backdrop_url: m.backdrop_path ? `https://image.tmdb.org/t/p/original${m.backdrop_path}` : null,
+    video_url: document.getElementById('video-url').value.trim(),
+    trailer_url: null,
+    source: document.getElementById('source').value || null,
+    added_by: document.getElementById('added-by').value || null,
+    added_at: new Date().toISOString().slice(0, 10),
+    featured: document.getElementById('featured').checked
+  };
+
+  // Limpia nulos/vacíos/undefined para un JSON limpio
+  Object.keys(obj).forEach(k => {
+    if (obj[k] === null || obj[k] === undefined || obj[k] === '' ||
+        (Array.isArray(obj[k]) && obj[k].length === 0)) {
+      delete obj[k];
+    }
+  });
+
+  document.getElementById('output').textContent = JSON.stringify(obj, null, 2);
+}
+
+async function copyOutput() {
+  try {
+    await navigator.clipboard.writeText(document.getElementById('output').textContent);
+    toast('¡Copiado! Pegá al Gist.');
+  } catch (e) {
+    toast('No se pudo copiar: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>
