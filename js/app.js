@@ -331,63 +331,130 @@
     star.setAttribute('aria-label', star.title);
   }
 
-  /* ================= TRADUCCIÓN DE SINOPSIS ================= */
-  async function translateText(text, from, to) {
-    const key = `${from}|${to}|${text}`;
-    if (translationCache.has(key)) return translationCache.get(key);
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    if (d.responseStatus !== 200) {
-      throw new Error(d.responseDetails || 'No se pudo traducir');
-    }
-    const out = d.responseData.translatedText;
-    translationCache.set(key, out);
-    return out;
+  /* ================= AUTO-TRADUCCIÓN DE SINOPSIS ================= */
+  const TC_KEY = 'cinema_translate_cache_v1';
+  const TC_MAX = 500;
+
+  function tcLoad() {
+    try { return JSON.parse(localStorage.getItem(TC_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function tcSave(cache) {
+    try {
+      const keys = Object.keys(cache);
+      if (keys.length > TC_MAX) {
+        keys.sort((a, b) => (cache[a]._t || 0) - (cache[b]._t || 0));
+        while (Object.keys(cache).length > TC_MAX) delete cache[keys.shift()];
+      }
+      localStorage.setItem(TC_KEY, JSON.stringify(cache));
+    } catch (e) {}
   }
 
+  /**
+   * Heurística simple para detectar si un texto está en inglés.
+   * - Si tiene caracteres específicos del español (ñ, tildes, ¿¡) → no es inglés
+   * - Si tiene suficientes stop-words del inglés → es inglés
+   */
+  function looksEnglish(text) {
+    if (!text) return false;
+    if (/[ñÑáéíóúÁÉÍÓÚüÜ¿¡]/.test(text)) return false;
+    const words = text.toLowerCase().split(/\s+/).slice(0, 50);
+    const markers = ['the','and','of','a','is','to','in','that','for','his','her','with','on','at',
+                     'by','from','are','was','be','but','has','have','this','who','an','he','she',
+                     'they','when','which','their','will','been','were','would','after','about'];
+    let count = 0;
+    for (const w of words) {
+      const clean = w.replace(/[^a-z]/g, '');
+      if (markers.indexOf(clean) >= 0) count++;
+    }
+    return count >= 3;
+  }
+
+  async function translateText(text, from, to) {
+    const key = from + '|' + to + '|' + text;
+    if (translationCache.has(key)) return translationCache.get(key);
+
+    // Cache persistente
+    const pc = tcLoad();
+    if (pc[key] && pc[key].t) {
+      translationCache.set(key, pc[key].t);
+      return pc[key].t;
+    }
+
+    const params = new URLSearchParams({ q: text, langpair: from + '|' + to });
+    const url = 'https://api.mymemory.translated.net/get?' + params.toString();
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+
+    const d = await r.json();
+    const status = parseInt(d.responseStatus, 10);
+    const translated = d.responseData && d.responseData.translatedText;
+    if (status !== 200 || !translated) {
+      throw new Error(d.responseDetails || 'Sin traducción');
+    }
+    translationCache.set(key, translated);
+    pc[key] = { t: translated, _t: Date.now() };
+    tcSave(pc);
+    return translated;
+  }
+
+  function openGoogleTranslate(text, from, to) {
+    const url = `https://translate.google.com/?sl=${encodeURIComponent(from)}&tl=${encodeURIComponent(to)}&op=translate&text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  /**
+   * Auto-traducción de la sinopsis al abrir el modal.
+   * - Si la sinopsis ya está en español → no hace nada, oculta el botón
+   * - Si está en inglés → lanza fetch de traducción, muestra "Traduciendo…"
+   * - Al completarse: reemplaza texto + botón "📖 Ver original" (toggle)
+   * - Si falla: botón "🌐 Traducir con Google" (abre Google Translate en nueva pestaña)
+   */
   function wireTranslateButton(m) {
     const btn = $('modal-translate');
-    if (!btn) return;
     const synEl = $('modal-synopsis');
     const original = m.synopsis || '';
 
-    // Si no hay sinopsis, ocultar el botón
-    if (!original.trim()) {
+    if (btn) {
       btn.style.display = 'none';
-      return;
+      btn.classList.remove('translated', 'loading');
+      btn.onclick = null;
     }
-    btn.style.display = '';
+    if (!original.trim() || !looksEnglish(original)) return;
 
-    // Reset visual
-    btn.classList.remove('translated', 'loading');
-    btn.textContent = '🌐 Traducir al español';
-
-    btn.onclick = async () => {
-      if (btn.classList.contains('loading')) return;
-      // Si ya está traducido, volver al original
-      if (btn.classList.contains('translated')) {
-        synEl.textContent = original;
-        btn.classList.remove('translated');
-        btn.textContent = '🌐 Traducir al español';
-        return;
+    (async () => {
+      if (btn) {
+        btn.style.display = '';
+        btn.classList.add('loading');
+        btn.textContent = 'Traduciendo';
       }
-      // Traducir
-      btn.classList.add('loading');
-      btn.textContent = 'Traduciendo';
       try {
         const translated = await translateText(original, 'en', 'es');
+        // Race protection: si el usuario cambió de peli, no tocar el DOM
+        if (state.currentMovie !== m) return;
         synEl.textContent = translated;
-        btn.classList.add('translated');
-        btn.textContent = '📖 Ver original';
+        if (btn) {
+          btn.classList.remove('loading');
+          btn.classList.add('translated');
+          btn.textContent = '📖 Ver original';
+          let showingTranslated = true;
+          btn.onclick = () => {
+            showingTranslated = !showingTranslated;
+            synEl.textContent = showingTranslated ? translated : original;
+            btn.textContent = showingTranslated ? '📖 Ver original' : '🌐 Volver a traducida';
+            btn.classList.toggle('translated', showingTranslated);
+          };
+        }
       } catch (e) {
-        toast('No se pudo traducir: ' + e.message, 4000);
-        btn.textContent = '🌐 Traducir al español';
-      } finally {
-        btn.classList.remove('loading');
+        console.error('[translate] MyMemory falló:', e);
+        if (state.currentMovie !== m) return;
+        if (btn) {
+          btn.classList.remove('loading');
+          btn.classList.remove('translated');
+          btn.textContent = '🌐 Traducir con Google';
+          btn.onclick = () => openGoogleTranslate(original, 'en', 'es');
+        }
       }
-    };
+    })();
   }
   function closeDetail() {
     $('detail-modal').classList.add('hidden');
