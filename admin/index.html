@@ -483,6 +483,7 @@
     <h1>🎬 CINEMA <span>PREMIUM</span></h1>
     <div class="header-actions">
       <span id="save-status" class="status"></span>
+      <button class="btn ghost btn-icon" onclick="Enrich.bulkEnrichAll()" title="Enriquecer masivamente desde OMDb (todas sin poster/director)">✨</button>
       <button class="btn ghost btn-icon" onclick="App.reload()" title="Recargar">🔄</button>
       <button class="btn ghost btn-icon" onclick="Settings.show(true)" title="Configuración">⚙️</button>
     </div>
@@ -1554,7 +1555,150 @@ const Enrich = (() => {
     return await App.enrichMovie(movieId, data);
   }
 
-  return { applyToMovie, parseRef, fetchTMDB, fetchOMDb };
+  /**
+   * Separa "Título (Año)" en { cleanTitle, year }.
+   * Si el título no tiene año en paréntesis, usa movie.year como fallback.
+   */
+  function parseTitleAndYear(title, movieYear) {
+    const t = String(title || '').trim();
+    const m = t.match(/^(.+?)\s*\((\d{4})\)\s*$/);
+    if (m) return { cleanTitle: m[1].trim(), year: parseInt(m[2], 10) };
+    return { cleanTitle: t, year: movieYear || null };
+  }
+
+  /**
+   * Convierte respuesta cruda de OMDb a nuestro schema.
+   */
+  function omdbToSchema(m) {
+    const ok = v => v != null && v !== '' && v !== 'N/A';
+    const out = {};
+    if (ok(m.Title)) out.title = m.Title;
+    if (ok(m.Year)) { const y = parseInt(m.Year, 10); if (y) out.year = y; }
+    const runtime = parseInt((m.Runtime || '').replace(/[^\d]/g, ''), 10);
+    if (runtime) out.duration_min = runtime;
+    if (ok(m.Director)) out.director = m.Director;
+    if (ok(m.Country)) out.country = m.Country;
+    if (ok(m.Language)) out.language = m.Language;
+    if (ok(m.Plot)) out.synopsis = m.Plot;
+    if (ok(m.imdbRating)) { const r = parseFloat(m.imdbRating); if (!isNaN(r)) out.rating = r; }
+    if (ok(m.Poster)) out.poster_url = m.Poster;
+    if (ok(m.Genre)) out.genres = m.Genre.split(',').map(g => g.trim()).filter(Boolean);
+    return out;
+  }
+
+  /**
+   * Consulta OMDb por título + año (usa endpoint t=).
+   * Devuelve el objeto crudo de OMDb o null si no lo encontró.
+   */
+  async function queryOMDbByTitle(title, year) {
+    const s = Settings.get();
+    if (!s.omdb) throw new Error('OMDb key no configurada');
+    const url = new URL('https://www.omdbapi.com/');
+    url.searchParams.set('apikey', s.omdb);
+    url.searchParams.set('t', String(title || '').toLowerCase());
+    if (year) url.searchParams.set('y', String(year));
+    url.searchParams.set('plot', 'full');
+    const r = await fetch(url.toString());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const m = await r.json();
+    if (m.Response === 'False') return null;
+    return m;
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /**
+   * Recorre todas las pelis sin poster O sin director, consulta OMDb por
+   * título+año para cada una, y aplica metadata en batch (un solo save al final).
+   */
+  async function bulkEnrichAll() {
+    const s = Settings.get();
+    if (!s.omdb) {
+      Toast.err('Configurá la OMDb key en ⚙️ primero');
+      return;
+    }
+    const all = App.getMovies();
+    const candidates = all.filter(m => !m.poster_url || !m.director);
+    if (candidates.length === 0) {
+      Toast.ok('No hay películas sin poster o director ✓');
+      return;
+    }
+    const preview = candidates.slice(0, 5).map(m =>
+      `<div style="padding:3px 0">• <b>${esc(m.title)}</b>${m.year ? ' ('+m.year+')' : ''}</div>`
+    ).join('');
+    const extra = candidates.length > 5 ? `<div style="color:#888; padding-top:6px; font-size:12px">...y ${candidates.length - 5} más</div>` : '';
+
+    Confirm.show(
+      `Se buscarán en OMDb ${candidates.length} película(s) sin poster o director. Estimado: ~${Math.ceil(candidates.length * 0.35)} segundos. Consumo: ${candidates.length} de 1000 llamadas diarias de OMDb.`,
+      preview + extra,
+      async () => { await runBulkEnrich(candidates); }
+    );
+  }
+
+  async function runBulkEnrich(candidates) {
+    const statusEl = document.getElementById('save-status');
+    const results = { enriched: 0, notFound: [], errors: [] };
+    const enrichments = [];
+
+    for (let i = 0; i < candidates.length; i++) {
+      const m = candidates[i];
+      if (statusEl) {
+        statusEl.className = 'status';
+        statusEl.textContent = `✨ ${i + 1}/${candidates.length} · ${m.title}`;
+      }
+      try {
+        const { cleanTitle, year } = parseTitleAndYear(m.title, m.year);
+        const raw = await queryOMDbByTitle(cleanTitle, year);
+        if (!raw) {
+          results.notFound.push(m.title);
+          await sleep(80);
+          continue;
+        }
+        const data = omdbToSchema(raw);
+        if (Object.keys(data).length > 0) {
+          enrichments.push({ movieId: m.id, data });
+          results.enriched++;
+        } else {
+          results.notFound.push(m.title);
+        }
+      } catch (e) {
+        results.errors.push({ title: m.title, error: e.message });
+      }
+      await sleep(80); // Rate-limit gentil
+    }
+
+    // Guardar todas las enrichments en un solo PATCH
+    if (enrichments.length > 0) {
+      try {
+        await App.bulkEnrich(enrichments);
+      } catch (e) {
+        Toast.err('Error guardando: ' + e.message);
+        if (statusEl) { statusEl.className = 'status err'; statusEl.textContent = 'Error'; }
+        return;
+      }
+    }
+
+    if (statusEl) {
+      statusEl.className = 'status ok';
+      statusEl.textContent = `✓ ${results.enriched} enriquecidas`;
+      setTimeout(() => { statusEl.textContent = ''; }, 5000);
+    }
+
+    let msg = `✓ ${results.enriched} enriquecida(s)`;
+    if (results.notFound.length) msg += ` · ${results.notFound.length} no encontrada(s)`;
+    if (results.errors.length) msg += ` · ${results.errors.length} error(es)`;
+    Toast.ok(msg);
+
+    // Log útil para debug
+    if (results.notFound.length) {
+      console.log('[bulkEnrich] No encontradas en OMDb:', results.notFound);
+    }
+    if (results.errors.length) {
+      console.log('[bulkEnrich] Errores:', results.errors);
+    }
+  }
+
+  return { applyToMovie, parseRef, fetchTMDB, fetchOMDb, bulkEnrichAll, parseTitleAndYear, omdbToSchema, queryOMDbByTitle };
 })();
 
 /* =================================================================
@@ -1768,6 +1912,17 @@ const App = (() => {
     return { removed };
   }
 
+  const ENRICH_PROTECTED = ['id', 'video_url', 'category', 'featured', 'added_by', 'added_at', 'source'];
+
+  function mergeEnrichInto(movie, data) {
+    const merged = Object.assign({}, movie, data);
+    ENRICH_PROTECTED.forEach(k => {
+      if (movie[k] !== undefined) merged[k] = movie[k];
+      else delete merged[k];
+    });
+    return merged;
+  }
+
   /**
    * Mergea metadata en una peli existente.
    * Preserva los campos "custom" del usuario: id, video_url, category,
@@ -1776,18 +1931,29 @@ const App = (() => {
   async function enrichMovie(movieId, data) {
     const idx = catalog.movies.findIndex(m => m.id === movieId);
     if (idx < 0) throw new Error('No existe esa peli');
-    const PROTECTED = ['id', 'video_url', 'category', 'featured', 'added_by', 'added_at', 'source'];
-    const original = catalog.movies[idx];
-    const merged = Object.assign({}, original, data);
-    // Restaurar los protegidos
-    PROTECTED.forEach(k => {
-      if (original[k] !== undefined) merged[k] = original[k];
-      else delete merged[k];
-    });
-    catalog.movies[idx] = merged;
+    catalog.movies[idx] = mergeEnrichInto(catalog.movies[idx], data);
     await save();
     render();
-    return merged;
+    return catalog.movies[idx];
+  }
+
+  /**
+   * Aplica muchos enrichments en una sola pasada + un único save.
+   * enrichments = [{ movieId, data }]
+   */
+  async function bulkEnrich(enrichments) {
+    let applied = 0;
+    enrichments.forEach(({ movieId, data }) => {
+      const idx = catalog.movies.findIndex(m => m.id === movieId);
+      if (idx < 0) return;
+      catalog.movies[idx] = mergeEnrichInto(catalog.movies[idx], data);
+      applied++;
+    });
+    if (applied > 0) {
+      await save();
+      render();
+    }
+    return { applied };
   }
 
   function render() {
@@ -1935,7 +2101,7 @@ const App = (() => {
 
   function getMovies() { return (catalog && catalog.movies) ? catalog.movies.slice() : []; }
 
-  return { init, reload, upsertMovie, deleteMovie, bulkInsert, bulkDelete, enrichMovie, getCategories, getMovies };
+  return { init, reload, upsertMovie, deleteMovie, bulkInsert, bulkDelete, enrichMovie, bulkEnrich, getCategories, getMovies };
 })();
 
 /* =================================================================
