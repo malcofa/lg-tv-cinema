@@ -22,19 +22,19 @@ jobs:
 
       - name: Validate appinfo.json
         run: |
-          node -e "const a=require('./appinfo.json'); if(!a.id||!a.version) throw 'appinfo.json inválido'; console.log('OK', a.id, a.version)"
+          node -e "const a=require('./tv/appinfo.json'); if(!a.id||!a.version) throw 'appinfo.json inválido'; console.log('OK', a.id, a.version)"
 
       - name: Package IPK
         run: |
           mkdir -p dist
-          ares-package . -o dist --no-minify
+          ares-package ./tv -o dist --no-minify
           ls -la dist
 
       - name: Get version
         id: version
         run: |
-          VERSION=$(node -e "console.log(require('./appinfo.json').version)")
-          APPID=$(node -e "console.log(require('./appinfo.json').id)")
+          VERSION=$(node -e "console.log(require('./tv/appinfo.json').version)")
+          APPID=$(node -e "console.log(require('./tv/appinfo.json').id)")
           IPK="${APPID}_${VERSION}_all.ipk"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "ipk_name=${IPK}" >> $GITHUB_OUTPUT
