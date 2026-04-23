@@ -84,6 +84,74 @@
     transition: border-color .15s, transform .15s;
   }
   .movie-card:hover { border-color: var(--accent); }
+  .movie-card.selected {
+    outline: 3px solid var(--accent);
+    outline-offset: -1px;
+    border-color: var(--accent);
+  }
+  .card-select {
+    position: absolute;
+    top: 8px; right: 8px;
+    z-index: 5;
+    background: rgba(0,0,0,0.7);
+    border-radius: 4px;
+    padding: 4px 5px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .card-select:hover { background: rgba(229,9,20,0.8); }
+  .card-select input {
+    width: 18px; height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--accent);
+  }
+
+  .selection-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--accent);
+    color: #fff;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 20px;
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(229,9,20,0.3);
+    flex-wrap: wrap;
+  }
+  .selection-bar .sel-count {
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .selection-bar .sel-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .selection-bar .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .selection-bar .btn.ghost {
+    border-color: rgba(255,255,255,0.4);
+    color: #fff;
+  }
+  .selection-bar .btn.ghost:hover {
+    background: rgba(255,255,255,0.15);
+  }
+  .selection-bar .btn.danger {
+    background: #0a0a0f;
+    color: #fff;
+  }
+  .selection-bar .btn.danger:hover {
+    background: #000;
+  }
   .movie-poster {
     width: 100%; aspect-ratio: 2/3; background: #000 center/cover no-repeat;
     position: relative;
@@ -318,6 +386,14 @@
       <span class="count" id="count">0 películas</span>
     </div>
 
+    <div id="selection-bar" class="selection-bar" style="display:none">
+      <div class="sel-count"><b id="selection-count">0</b> seleccionada(s)</div>
+      <div class="sel-actions">
+        <button class="btn ghost" onclick="Selection.selectAllVisible()">☑ Seleccionar visibles</button>
+        <button class="btn ghost" onclick="Selection.clear()">✕ Deseleccionar todo</button>
+        <button class="btn danger" id="selection-delete-btn" onclick="Selection.deleteSelected()">🗑️ Eliminar</button>
+      </div>
+    </div>
     <div id="movie-list" class="movie-list"></div>
     <div id="empty-state" class="empty-state hidden">
       <h2>El catálogo está vacío</h2>
@@ -1271,6 +1347,98 @@ const BulkImport = (() => {
 /* =================================================================
    CONFIRM MODAL
 ================================================================= */
+/* =================================================================
+   SELECTION — multi-select + bulk delete con confirmación
+================================================================= */
+const Selection = (() => {
+  const ids = new Set();
+
+  function toggle(id) {
+    if (ids.has(id)) ids.delete(id);
+    else ids.add(id);
+    updateCard(id);
+    updateBar();
+  }
+
+  function has(id) { return ids.has(id); }
+
+  function clear() {
+    ids.clear();
+    document.querySelectorAll('.movie-card.selected').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.movie-card input[type="checkbox"]:checked').forEach(c => c.checked = false);
+    updateBar();
+  }
+
+  function selectAllVisible() {
+    document.querySelectorAll('.movie-card').forEach(card => {
+      const id = card.dataset.movieId;
+      if (!id) return;
+      ids.add(id);
+      card.classList.add('selected');
+      const cb = card.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = true;
+    });
+    updateBar();
+  }
+
+  function updateCard(id) {
+    const card = document.querySelector(`.movie-card[data-movie-id="${CSS.escape(id)}"]`);
+    if (!card) return;
+    const selected = ids.has(id);
+    card.classList.toggle('selected', selected);
+    const cb = card.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = selected;
+  }
+
+  function updateBar() {
+    const bar = document.getElementById('selection-bar');
+    const count = ids.size;
+    bar.style.display = count > 0 ? 'flex' : 'none';
+    document.getElementById('selection-count').textContent = count;
+    document.getElementById('selection-delete-btn').textContent = `🗑️ Eliminar ${count}`;
+  }
+
+  async function deleteSelected() {
+    if (ids.size === 0) return;
+    const count = ids.size;
+    const idsArr = [...ids];
+    const movies = App.getMovies().filter(m => ids.has(m.id));
+
+    const previewList = movies.slice(0, 8).map(m =>
+      `<div style="padding:3px 0"><b>${esc(m.title)}</b>${m.year ? ' <span style="color:#888">('+m.year+')</span>' : ''}</div>`
+    ).join('');
+    const extra = movies.length > 8
+      ? `<div style="color:#888; padding-top:6px; font-size:12px">...y ${movies.length - 8} más</div>`
+      : '';
+
+    Confirm.show(
+      `Vas a eliminar ${count} película(s) del catálogo. La acción es inmediata, se sincroniza al Gist y no se puede deshacer.`,
+      `<div style="max-height:240px; overflow-y:auto">${previewList}${extra}</div>`,
+      async () => {
+        try {
+          const res = await App.bulkDelete(idsArr);
+          clear();
+          Toast.ok(`${res.removed} película(s) eliminada(s)`);
+        } catch (e) {
+          Toast.err('Error: ' + e.message);
+        }
+      }
+    );
+  }
+
+  /** Limpia IDs que ya no existen en el catálogo (después de un reload/edit). */
+  function purgeStale() {
+    const validIds = new Set(App.getMovies().map(m => m.id));
+    let changed = false;
+    [...ids].forEach(id => {
+      if (!validIds.has(id)) { ids.delete(id); changed = true; }
+    });
+    if (changed) updateBar();
+  }
+
+  return { toggle, has, clear, selectAllVisible, deleteSelected, purgeStale, updateBar };
+})();
+
 const Confirm = (() => {
   let onOk = null;
   function show(text, details, cb) {
@@ -1378,7 +1546,22 @@ const App = (() => {
     return { added, skipped };
   }
 
+  async function bulkDelete(ids) {
+    const idSet = new Set(ids);
+    const before = catalog.movies.length;
+    catalog.movies = catalog.movies.filter(m => !idSet.has(m.id));
+    const removed = before - catalog.movies.length;
+    if (removed > 0) {
+      await save();
+      render();
+    }
+    return { removed };
+  }
+
   function render() {
+    // Depura IDs de Selection que ya no existan (tras reload/edit/delete)
+    if (window.Selection) Selection.purgeStale();
+
     const q = (document.getElementById('q-filter').value || '').toLowerCase();
     const cat = document.getElementById('cat-filter').value;
     const feat = document.getElementById('feat-filter').value;
@@ -1429,6 +1612,8 @@ const App = (() => {
   function buildCard(m) {
     const d = document.createElement('div');
     d.className = 'movie-card';
+    d.dataset.movieId = m.id;
+    if (Selection.has(m.id)) d.classList.add('selected');
     const poster = m.poster_url
       ? `<div class="movie-poster" style="background-image:url('${esc(m.poster_url)}')"></div>`
       : `<div class="movie-poster empty">🎬</div>`;
@@ -1441,6 +1626,9 @@ const App = (() => {
     d.innerHTML = `
       ${poster}
       ${m.featured ? '<div class="movie-featured">★ DESTACADA</div>' : ''}
+      <label class="card-select" title="Seleccionar">
+        <input type="checkbox" data-sel-id="${esc(m.id)}" ${Selection.has(m.id) ? 'checked' : ''}>
+      </label>
       <div class="movie-body">
         <div class="movie-title">${esc(m.title)}</div>
         <div class="movie-sub">${esc(sub)}</div>
@@ -1452,6 +1640,9 @@ const App = (() => {
       </div>`;
     d.querySelector('[data-act="edit"]').onclick = () => MovieForm.openEdit(m);
     d.querySelector('[data-act="delete"]').onclick = () => askDelete(m);
+    const cb = d.querySelector('input[type="checkbox"]');
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', () => Selection.toggle(m.id));
     return d;
   }
 
@@ -1484,7 +1675,7 @@ const App = (() => {
 
   function getMovies() { return (catalog && catalog.movies) ? catalog.movies.slice() : []; }
 
-  return { init, reload, upsertMovie, deleteMovie, bulkInsert, getCategories, getMovies };
+  return { init, reload, upsertMovie, deleteMovie, bulkInsert, bulkDelete, getCategories, getMovies };
 })();
 
 /* =================================================================
