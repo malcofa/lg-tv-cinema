@@ -13,6 +13,9 @@
     scrollY: 0
   };
 
+  // Cache en memoria de traducciones: text -> translated
+  const translationCache = new Map();
+
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -233,6 +236,9 @@
     // Botón admin: destacar / quitar destacada (solo si hay credenciales)
     renderFeaturedButton(m);
 
+    // Botón de traducción de sinopsis
+    wireTranslateButton(m);
+
     state.scrollY = window.scrollY;
     document.body.classList.add('modal-open');
     $('detail-modal').classList.remove('hidden');
@@ -323,6 +329,65 @@
     star.textContent = featured ? '★' : '☆';
     star.title = featured ? 'Quitar destacada' : 'Destacar';
     star.setAttribute('aria-label', star.title);
+  }
+
+  /* ================= TRADUCCIÓN DE SINOPSIS ================= */
+  async function translateText(text, from, to) {
+    const key = `${from}|${to}|${text}`;
+    if (translationCache.has(key)) return translationCache.get(key);
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (d.responseStatus !== 200) {
+      throw new Error(d.responseDetails || 'No se pudo traducir');
+    }
+    const out = d.responseData.translatedText;
+    translationCache.set(key, out);
+    return out;
+  }
+
+  function wireTranslateButton(m) {
+    const btn = $('modal-translate');
+    if (!btn) return;
+    const synEl = $('modal-synopsis');
+    const original = m.synopsis || '';
+
+    // Si no hay sinopsis, ocultar el botón
+    if (!original.trim()) {
+      btn.style.display = 'none';
+      return;
+    }
+    btn.style.display = '';
+
+    // Reset visual
+    btn.classList.remove('translated', 'loading');
+    btn.textContent = '🌐 Traducir al español';
+
+    btn.onclick = async () => {
+      if (btn.classList.contains('loading')) return;
+      // Si ya está traducido, volver al original
+      if (btn.classList.contains('translated')) {
+        synEl.textContent = original;
+        btn.classList.remove('translated');
+        btn.textContent = '🌐 Traducir al español';
+        return;
+      }
+      // Traducir
+      btn.classList.add('loading');
+      btn.textContent = 'Traduciendo';
+      try {
+        const translated = await translateText(original, 'en', 'es');
+        synEl.textContent = translated;
+        btn.classList.add('translated');
+        btn.textContent = '📖 Ver original';
+      } catch (e) {
+        toast('No se pudo traducir: ' + e.message, 4000);
+        btn.textContent = '🌐 Traducir al español';
+      } finally {
+        btn.classList.remove('loading');
+      }
+    };
   }
   function closeDetail() {
     $('detail-modal').classList.add('hidden');
