@@ -2,279 +2,1083 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Helper — Cinema Clásico</title>
+<title>Admin — Cinema Clásico</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
+  :root {
+    --bg: #0a0a0f;
+    --card: #16161f;
+    --border: #2a2a35;
+    --text: #eee;
+    --muted: #888;
+    --accent: #e50914;
+    --accent-hover: #c30810;
+    --success: #2ecc71;
+    --danger: #e74c3c;
+  }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0a0a0f; color: #eee; margin: 0; padding: 20px; min-height: 100vh; }
-  h1 { color: #e50914; margin: 0 0 4px; }
-  .sub { color: #888; margin-bottom: 24px; }
-  .container { max-width: 960px; margin: 0 auto; }
-  .card { background: #16161f; padding: 20px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #222; }
-  label { display: block; font-size: 13px; color: #aaa; margin-bottom: 4px; }
-  input, textarea, select { width: 100%; padding: 10px; background: #0a0a0f; color: #fff; border: 1px solid #333; border-radius: 4px; font-size: 14px; font-family: inherit; }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: #e50914; }
-  textarea { resize: vertical; font-family: ui-monospace, Consolas, monospace; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-  button { background: #e50914; color: #fff; border: 0; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px; }
-  button:hover { background: #c30810; }
-  button.secondary { background: #333; }
-  button.secondary:hover { background: #444; }
-  .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; max-height: 400px; overflow-y: auto; }
-  .result { cursor: pointer; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #0a0a0f; }
-  .result:hover { border-color: #e50914; }
-  .result img { width: 100%; display: block; aspect-ratio: 2/3; object-fit: cover; }
-  .result .info { padding: 8px; font-size: 12px; }
-  .result .info .t { font-weight: 700; }
-  .result .info .y { color: #888; }
-  pre { background: #000; padding: 16px; border-radius: 4px; overflow-x: auto; font-size: 12px; color: #7cfc00; max-height: 500px; overflow-y: auto; }
-  .hint { font-size: 12px; color: #888; margin-top: 6px; }
-  .toast { position: fixed; bottom: 20px; right: 20px; background: #e50914; color: #fff; padding: 12px 20px; border-radius: 4px; opacity: 0; transform: translateY(10px); transition: .3s; pointer-events: none; }
-  .toast.v { opacity: 1; transform: translateY(0); }
-  details { margin-top: 10px; }
-  summary { cursor: pointer; color: #aaa; font-size: 13px; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; }
+  .hidden { display: none !important; }
+  h1, h2, h3 { margin: 0; }
+  a { color: var(--accent); }
+  button { font-family: inherit; }
+  input, textarea, select { font-family: inherit; }
+
+  /* Header */
+  header {
+    background: #12121a;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky; top: 0; z-index: 50;
+  }
+  header h1 { font-size: 22px; letter-spacing: 2px; }
+  header h1 span { color: var(--accent); }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .status { color: var(--muted); font-size: 13px; }
+  .status.ok { color: var(--success); }
+  .status.err { color: var(--danger); }
+
+  /* Layout */
+  main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  /* Buttons */
+  .btn {
+    background: var(--accent); color: #fff; border: 0;
+    padding: 10px 18px; border-radius: 4px; cursor: pointer;
+    font-weight: 600; font-size: 14px; transition: background .15s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.secondary { background: #2a2a35; }
+  .btn.secondary:hover { background: #3a3a45; }
+  .btn.danger { background: var(--danger); }
+  .btn.danger:hover { background: #c0392b; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn.ghost:hover { background: #1a1a24; }
+  .btn-icon { padding: 6px 10px; font-size: 14px; }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;
+  }
+  .toolbar input[type="search"] {
+    flex: 1; min-width: 200px;
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    padding: 10px 14px; border-radius: 4px; font-size: 14px;
+  }
+  .toolbar select {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 4px; font-size: 14px;
+  }
+  .count { color: var(--muted); font-size: 13px; }
+
+  /* Movie list */
+  .movie-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .movie-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: border-color .15s, transform .15s;
+  }
+  .movie-card:hover { border-color: var(--accent); }
+  .movie-poster {
+    width: 100%; aspect-ratio: 2/3; background: #000 center/cover no-repeat;
+    position: relative;
+  }
+  .movie-poster.empty {
+    display: flex; align-items: center; justify-content: center;
+    background: #1a1a24; font-size: 48px; color: #333;
+  }
+  .movie-featured {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--accent); color: #fff; padding: 3px 8px;
+    border-radius: 3px; font-size: 11px; font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .movie-body { padding: 12px; flex: 1; display: flex; flex-direction: column; }
+  .movie-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; line-height: 1.3; }
+  .movie-sub { font-size: 12px; color: var(--muted); margin-bottom: 10px; min-height: 16px; }
+  .movie-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .tag {
+    font-size: 10px; padding: 2px 7px; background: #24242e; border-radius: 3px;
+    color: #ccc; letter-spacing: 0.5px;
+  }
+  .tag.cat { background: #1e2f4a; color: #6bb6ff; }
+  .movie-actions { display: flex; gap: 6px; margin-top: auto; }
+  .movie-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center; padding: 80px 20px; color: var(--muted);
+  }
+  .empty-state h2 { color: var(--text); margin-bottom: 8px; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px; overflow-y: auto;
+  }
+  .modal {
+    background: var(--card); border-radius: 8px; border: 1px solid var(--border);
+    max-width: 900px; width: 100%; max-height: 95vh;
+    display: flex; flex-direction: column;
+  }
+  .modal-head {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+  .modal-foot {
+    padding: 16px 20px; border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 10px;
+  }
+  .close-x {
+    background: none; border: 0; color: var(--muted); font-size: 22px;
+    cursor: pointer; padding: 4px 10px;
+  }
+  .close-x:hover { color: var(--text); }
+
+  /* Forms */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .field label.required::after { content: ' *'; color: var(--accent); }
+  .field input, .field textarea, .field select {
+    background: #0a0a0f; color: var(--text); border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 4px; font-size: 14px; width: 100%;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .field textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+  .field .hint { font-size: 11px; color: var(--muted); }
+  .field .err { font-size: 12px; color: var(--danger); display: none; }
+  .field.invalid input, .field.invalid textarea { border-color: var(--danger); }
+  .field.invalid .err { display: block; }
+
+  .checkbox-field {
+    display: flex; align-items: center; gap: 8px;
+    background: #0a0a0f; padding: 10px 12px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .checkbox-field input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  /* TMDB search inline */
+  .tmdb-inline {
+    border: 1px dashed var(--border); border-radius: 6px;
+    padding: 12px; margin-bottom: 16px; background: rgba(229,9,20,0.04);
+  }
+  .tmdb-inline h4 { font-size: 13px; color: var(--accent); margin-bottom: 8px; letter-spacing: 1px; }
+  .tmdb-search-row { display: flex; gap: 8px; }
+  .tmdb-search-row input { flex: 1; }
+  .tmdb-results {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px; margin-top: 10px; max-height: 240px; overflow-y: auto;
+  }
+  .tmdb-result {
+    cursor: pointer; background: #0a0a0f; border-radius: 4px; overflow: hidden;
+    border: 2px solid transparent; transition: border-color .15s;
+  }
+  .tmdb-result:hover { border-color: var(--accent); }
+  .tmdb-result img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
+  .tmdb-result .info { padding: 6px; font-size: 11px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--success); color: #fff; padding: 12px 20px;
+    border-radius: 4px; font-weight: 600; font-size: 14px;
+    opacity: 0; transform: translateY(10px); transition: .25s;
+    pointer-events: none; z-index: 200; max-width: 400px;
+  }
+  .toast.err { background: var(--danger); }
+  .toast.visible { opacity: 1; transform: translateY(0); }
+
+  /* Settings panel */
+  .settings-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 24px; max-width: 600px; margin: 60px auto;
+  }
+  .settings-card h2 { margin-bottom: 8px; }
+  .settings-card .sub { color: var(--muted); margin-bottom: 20px; font-size: 14px; }
+  .settings-card .field { margin-bottom: 14px; }
+  .settings-card .hint a { color: #6bb6ff; }
+
+  /* Spinner */
+  .spinner {
+    width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Confirm */
+  .confirm-text { margin-bottom: 16px; line-height: 1.5; }
+  .confirm-movie {
+    background: #0a0a0f; padding: 10px; border-radius: 4px; margin-bottom: 16px;
+    border-left: 3px solid var(--accent);
+  }
+
+  /* Tags input (genres, subtitles) */
+  .tags-input {
+    background: #0a0a0f; border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 40px;
+  }
+  .tags-input:focus-within { border-color: var(--accent); }
+  .tags-input .tag-chip {
+    background: #2a2a35; padding: 4px 8px; border-radius: 3px; font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tags-input .tag-chip button {
+    background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0;
+  }
+  .tags-input .tag-chip button:hover { color: var(--danger); }
+  .tags-input input {
+    flex: 1; min-width: 100px; border: 0; background: transparent; color: var(--text);
+    padding: 4px 8px; font-size: 13px; outline: none;
+  }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>🎬 Helper JSON — Cinema Clásico</h1>
-  <p class="sub">Busca metadata en TMDB y genera el bloque JSON listo para pegar al Gist.</p>
 
-  <div class="card">
-    <label>API Key de TMDB (se guarda en este navegador)</label>
-    <input id="tmdb-key" placeholder="v3 API key — sacala de https://www.themoviedb.org/settings/api">
-    <p class="hint">Crear cuenta gratis en TMDB → Settings → API → Developer. Solo hace falta una vez.</p>
+<!-- ================= SETTINGS ================= -->
+<div id="settings-view" class="hidden">
+  <div class="settings-card">
+    <h2>⚙️ Configuración</h2>
+    <p class="sub">Necesitamos 3 credenciales para administrar el catálogo. Se guardan solo en este navegador.</p>
+
+    <div class="field">
+      <label class="required">GitHub Personal Access Token</label>
+      <input id="s-pat" type="password" placeholder="ghp_...">
+      <span class="hint">
+        Crear en <a href="https://github.com/settings/tokens?type=beta" target="_blank">github.com/settings/tokens</a>
+        · tipo <b>Fine-grained</b> · scope: <b>Gists (Read and write)</b>
+      </span>
+    </div>
+
+    <div class="field">
+      <label class="required">Gist ID</label>
+      <input id="s-gist" placeholder="b74171318151c72fd3be5941e28716d2">
+      <span class="hint">Es el hash largo en la URL del Gist (gist.github.com/usuario/<b>HASH</b>)</span>
+    </div>
+
+    <div class="field">
+      <label>TMDB API Key (v3)</label>
+      <input id="s-tmdb" placeholder="(opcional) para autocompletar desde TMDB">
+      <span class="hint">Opcional. Sacala de <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a></span>
+    </div>
+
+    <div style="display:flex; gap: 10px; margin-top: 20px;">
+      <button class="btn" onclick="Settings.save()">Guardar y continuar</button>
+      <button class="btn ghost" onclick="Settings.clear()" style="margin-left:auto">Borrar todo</button>
+    </div>
   </div>
+</div>
 
-  <div class="card">
-    <label>1. Buscar película en TMDB</label>
-    <div style="display:flex; gap:8px; margin-bottom:8px;">
-      <input id="search-q" placeholder="Ej: Battleship Potemkin" style="flex:1">
-      <select id="search-lang" style="width:120px">
-        <option value="es-ES">Español</option>
-        <option value="en-US">English</option>
+<!-- ================= ADMIN ================= -->
+<div id="admin-view" class="hidden">
+  <header>
+    <h1>🎬 CINEMA <span>CLÁSICO</span></h1>
+    <div class="header-actions">
+      <span id="save-status" class="status"></span>
+      <button class="btn ghost btn-icon" onclick="App.reload()" title="Recargar">🔄</button>
+      <button class="btn ghost btn-icon" onclick="Settings.show()" title="Configuración">⚙️</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <button class="btn" onclick="MovieForm.openNew()">+ Nueva película</button>
+      <input type="search" id="q-filter" placeholder="Buscar por título, director, año...">
+      <select id="cat-filter">
+        <option value="">Todas las categorías</option>
       </select>
-      <button onclick="doSearch()">Buscar</button>
+      <select id="feat-filter">
+        <option value="">Todas</option>
+        <option value="yes">Solo destacadas</option>
+        <option value="no">Solo no destacadas</option>
+      </select>
+      <span class="count" id="count">0 películas</span>
     </div>
-    <div id="results" class="results"></div>
+
+    <div id="movie-list" class="movie-list"></div>
+    <div id="empty-state" class="empty-state hidden">
+      <h2>El catálogo está vacío</h2>
+      <p>Agregá la primera película con el botón <b>+ Nueva</b>.</p>
+    </div>
+  </main>
+</div>
+
+<!-- ================= MOVIE MODAL ================= -->
+<div id="movie-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modal-title">Nueva película</h2>
+      <button class="close-x" onclick="MovieForm.close()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tmdb-inline" id="tmdb-box">
+        <h4>🔎 AUTOCOMPLETAR DESDE TMDB (opcional)</h4>
+        <div class="tmdb-search-row">
+          <input id="tmdb-q" placeholder="Buscar título en TMDB...">
+          <select id="tmdb-lang" style="width:110px; background: #0a0a0f; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0 8px;">
+            <option value="es-ES">Español</option>
+            <option value="en-US">English</option>
+          </select>
+          <button class="btn secondary" onclick="TMDB.search()">Buscar</button>
+        </div>
+        <div id="tmdb-results" class="tmdb-results"></div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field full">
+          <label class="required">Título</label>
+          <input id="f-title" required>
+          <span class="err">El título es obligatorio</span>
+        </div>
+
+        <div class="field full">
+          <label class="required">URL del video</label>
+          <input id="f-video_url" required placeholder="https://archive.org/download/.../peli.mp4">
+          <span class="hint">La URL directa al .mp4 (o .m3u8). Es lo que reproduce la TV.</span>
+          <span class="err">La URL del video es obligatoria</span>
+        </div>
+
+        <div class="field full">
+          <label>Título original</label>
+          <input id="f-original_title">
+        </div>
+
+        <div class="field">
+          <label>Año</label>
+          <input id="f-year" type="number" min="1888" max="2100">
+        </div>
+
+        <div class="field">
+          <label>Duración (min)</label>
+          <input id="f-duration_min" type="number" min="1">
+        </div>
+
+        <div class="field">
+          <label>Director</label>
+          <input id="f-director">
+        </div>
+
+        <div class="field">
+          <label>País</label>
+          <input id="f-country">
+        </div>
+
+        <div class="field">
+          <label>Idioma</label>
+          <input id="f-language" placeholder="Silente / Español / Inglés...">
+        </div>
+
+        <div class="field">
+          <label>Calidad</label>
+          <select id="f-quality">
+            <option value="">(sin especificar)</option>
+            <option>480p</option>
+            <option>720p</option>
+            <option>1080p</option>
+            <option>4K</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Rating (0-10)</label>
+          <input id="f-rating" type="number" step="0.1" min="0" max="10">
+        </div>
+
+        <div class="field">
+          <label>Peso (GB)</label>
+          <input id="f-size_gb" type="number" step="0.1" min="0">
+        </div>
+
+        <div class="field">
+          <label>Categoría</label>
+          <input id="f-category" list="cat-list" placeholder="Clásicos mudos">
+          <datalist id="cat-list"></datalist>
+        </div>
+
+        <div class="field full">
+          <label>Géneros</label>
+          <div class="tags-input" id="f-genres">
+            <input placeholder="Enter para agregar..." data-tags-for="genres">
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>Subtítulos disponibles</label>
+          <div class="tags-input" id="f-subtitles">
+            <input placeholder="Enter para agregar: es, en, fr..." data-tags-for="subtitles">
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>Tagline</label>
+          <input id="f-tagline" placeholder="Una frase que vende la peli">
+        </div>
+
+        <div class="field full">
+          <label>Sinopsis</label>
+          <textarea id="f-synopsis" rows="4"></textarea>
+        </div>
+
+        <div class="field full">
+          <label>Poster URL</label>
+          <input id="f-poster_url" placeholder="https://image.tmdb.org/t/p/w500/..." type="url">
+        </div>
+
+        <div class="field full">
+          <label>Backdrop URL (imagen hero horizontal)</label>
+          <input id="f-backdrop_url" type="url">
+        </div>
+
+        <div class="field full">
+          <label>Trailer URL</label>
+          <input id="f-trailer_url" type="url">
+        </div>
+
+        <div class="field">
+          <label>Fuente (hosting)</label>
+          <input id="f-source" placeholder="Internet Archive / pCloud Tío Juan">
+        </div>
+
+        <div class="field">
+          <label>Agregada por</label>
+          <input id="f-added_by" placeholder="Papá, Tío Juan...">
+        </div>
+
+        <div class="field full">
+          <div class="checkbox-field">
+            <input type="checkbox" id="f-featured">
+            <label for="f-featured" style="font-size:14px; color:var(--text); margin:0; cursor:pointer;">
+              ⭐ Destacada (aparece en el Hero rotatorio de la TV)
+            </label>
+          </div>
+        </div>
+
+        <input type="hidden" id="f-id">
+        <input type="hidden" id="f-added_at">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="MovieForm.close()">Cancelar</button>
+      <button class="btn" id="save-movie-btn" onclick="MovieForm.save()">💾 Guardar</button>
+    </div>
   </div>
+</div>
 
-  <div class="card">
-    <label>2. URL del video (la que te pasó tu familiar)</label>
-    <input id="video-url" placeholder="https://archive.org/download/.../peli.mp4">
-    <p class="hint">Formatos soportados por webOS: MP4 (H.264/AAC), HLS (.m3u8), MKV limitado.</p>
-
-    <div class="row-3" style="margin-top:12px">
-      <div>
-        <label>Calidad</label>
-        <select id="quality">
-          <option value="">(sin especificar)</option>
-          <option>480p</option>
-          <option>720p</option>
-          <option>1080p</option>
-          <option>4K</option>
-        </select>
-      </div>
-      <div>
-        <label>Peso aprox (GB)</label>
-        <input id="size-gb" type="number" step="0.1" placeholder="1.5">
-      </div>
-      <div>
-        <label>Categoría</label>
-        <input id="category" placeholder="Clásicos mudos">
-      </div>
+<!-- ================= CONFIRM MODAL ================= -->
+<div id="confirm-modal" class="modal-backdrop hidden">
+  <div class="modal" style="max-width: 500px;">
+    <div class="modal-head">
+      <h2>Confirmar</h2>
     </div>
-
-    <div class="row">
-      <div>
-        <label>Fuente / hosting</label>
-        <input id="source" placeholder="Internet Archive / pCloud Tío Juan / ...">
-      </div>
-      <div>
-        <label>Agregada por</label>
-        <input id="added-by" placeholder="Tío Juan">
-      </div>
+    <div class="modal-body">
+      <p class="confirm-text" id="confirm-text"></p>
+      <div class="confirm-movie" id="confirm-movie"></div>
     </div>
-
-    <div class="row">
-      <div>
-        <label>Idioma</label>
-        <input id="language" placeholder="Silente / Español / Inglés">
-      </div>
-      <div>
-        <label>Subtítulos (separados por coma)</label>
-        <input id="subtitles" placeholder="es, en">
-      </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="Confirm.close()">Cancelar</button>
+      <button class="btn danger" id="confirm-ok-btn">Confirmar</button>
     </div>
-
-    <div>
-      <label><input type="checkbox" id="featured"> Destacada (aparece en el Hero rotatorio)</label>
-    </div>
-  </div>
-
-  <div class="card">
-    <label>3. Bloque JSON generado</label>
-    <pre id="output">Seleccioná una película de los resultados de arriba y completá la URL del video.</pre>
-    <div style="display:flex; gap:8px; margin-top:8px">
-      <button onclick="copyOutput()">📋 Copiar al portapapeles</button>
-      <button class="secondary" onclick="regenerate()">↻ Regenerar</button>
-    </div>
-    <details>
-      <summary>¿Cómo lo pego al Gist?</summary>
-      <ol style="color:#bbb; font-size:13px; line-height:1.7">
-        <li>Abrí tu Gist de catálogo en <code>gist.github.com</code></li>
-        <li>Click en "Edit"</li>
-        <li>Dentro del array <code>"movies": [ ... ]</code>, pegá el bloque (recordá agregar una coma antes si ya hay otras pelis)</li>
-        <li>Actualizá <code>"updated_at"</code> con la fecha de hoy</li>
-        <li>Click "Update gist"</li>
-        <li>En la TV, tocá "↻ Refrescar" (o cerrá y abrí la app). Aparece la nueva peli.</li>
-      </ol>
-    </details>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
 
 <script>
-const KEY_STORAGE = 'tmdb_api_key';
-let selected = null;
+/* =================================================================
+   SETTINGS — persistencia de credenciales en localStorage
+================================================================= */
+const Settings = (() => {
+  const KEY = 'cinema_admin_settings_v1';
+  let data = load();
 
-document.getElementById('tmdb-key').value = localStorage.getItem(KEY_STORAGE) || '';
-document.getElementById('tmdb-key').addEventListener('change', e => {
-  localStorage.setItem(KEY_STORAGE, e.target.value.trim());
-});
-
-document.getElementById('search-q').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSearch();
-});
-
-['video-url','quality','size-gb','category','source','added-by','language','subtitles','featured']
-  .forEach(id => document.getElementById(id).addEventListener('input', regenerate));
-document.getElementById('featured').addEventListener('change', regenerate);
-
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('v');
-  setTimeout(() => t.classList.remove('v'), 2000);
-}
-
-async function doSearch() {
-  const key = document.getElementById('tmdb-key').value.trim();
-  const q = document.getElementById('search-q').value.trim();
-  const lang = document.getElementById('search-lang').value;
-  if (!key) return toast('Pegá tu API key de TMDB primero');
-  if (!q) return toast('Ingresá algo que buscar');
-
-  const url = `https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(q)}&language=${lang}&include_adult=false`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    renderResults(data.results || []);
-  } catch (e) {
-    toast('Error: ' + e.message);
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}'); }
+    catch { return {}; }
   }
-}
+  function save() {
+    const pat = document.getElementById('s-pat').value.trim();
+    const gist = document.getElementById('s-gist').value.trim();
+    const tmdb = document.getElementById('s-tmdb').value.trim();
+    if (!pat || !gist) return Toast.err('PAT y Gist ID son obligatorios');
+    data = { pat, gist, tmdb };
+    localStorage.setItem(KEY, JSON.stringify(data));
+    show(false);
+    App.init();
+  }
+  function clear() {
+    if (!confirm('¿Borrar todas las credenciales?')) return;
+    localStorage.removeItem(KEY);
+    data = {};
+    show(true);
+  }
+  function show(force) {
+    const settingsView = document.getElementById('settings-view');
+    const adminView = document.getElementById('admin-view');
+    const needSetup = force || !data.pat || !data.gist;
+    settingsView.classList.toggle('hidden', !needSetup);
+    adminView.classList.toggle('hidden', needSetup);
+    if (needSetup) {
+      document.getElementById('s-pat').value = data.pat || '';
+      document.getElementById('s-gist').value = data.gist || '';
+      document.getElementById('s-tmdb').value = data.tmdb || '';
+    }
+  }
+  function get() { return data; }
+  return { load, save, clear, show, get };
+})();
 
-function renderResults(list) {
-  const el = document.getElementById('results');
-  el.innerHTML = '';
-  if (list.length === 0) { el.innerHTML = '<p style="color:#888">Sin resultados.</p>'; return; }
-  list.slice(0, 24).forEach(m => {
-    const div = document.createElement('div');
-    div.className = 'result';
-    const poster = m.poster_path ? `https://image.tmdb.org/t/p/w300${m.poster_path}` : '';
-    div.innerHTML = `
-      ${poster ? `<img src="${poster}">` : '<div style="aspect-ratio:2/3;background:#222;display:flex;align-items:center;justify-content:center;color:#555">🎬</div>'}
-      <div class="info">
-        <div class="t">${escapeHtml(m.title)}</div>
-        <div class="y">${(m.release_date || '').slice(0,4)} · ★ ${m.vote_average || '-'}</div>
+/* =================================================================
+   GIST API — lectura y escritura del catálogo
+================================================================= */
+const GistAPI = (() => {
+  async function read() {
+    const { pat, gist } = Settings.get();
+    const res = await fetch(`https://api.github.com/gists/${gist}`, {
+      headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!res.ok) throw new Error(`Leer Gist: ${res.status} ${res.statusText}`);
+    const json = await res.json();
+    // Buscar el primer archivo .json
+    const files = json.files || {};
+    const fname = Object.keys(files).find(k => k.endsWith('.json')) || Object.keys(files)[0];
+    if (!fname) throw new Error('El Gist no tiene archivos');
+    const file = files[fname];
+    let content = file.content;
+    if (file.truncated) {
+      const r2 = await fetch(file.raw_url);
+      content = await r2.text();
+    }
+    let parsed;
+    try { parsed = JSON.parse(content); }
+    catch (e) { throw new Error('El JSON del Gist es inválido: ' + e.message); }
+    return { filename: fname, data: parsed };
+  }
+
+  async function write(filename, data) {
+    const { pat, gist } = Settings.get();
+    const body = { files: { [filename]: { content: JSON.stringify(data, null, 2) } } };
+    const res = await fetch(`https://api.github.com/gists/${gist}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${pat}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`Guardar Gist: ${res.status} ${t.slice(0, 200)}`);
+    }
+    return await res.json();
+  }
+  return { read, write };
+})();
+
+/* =================================================================
+   TMDB — búsqueda + fetch detallado
+================================================================= */
+const TMDB = (() => {
+  async function search() {
+    const s = Settings.get();
+    const q = document.getElementById('tmdb-q').value.trim();
+    const lang = document.getElementById('tmdb-lang').value;
+    const box = document.getElementById('tmdb-results');
+    if (!s.tmdb) return Toast.err('Configurá tu TMDB API key en ⚙️');
+    if (!q) return Toast.err('Escribí algo para buscar');
+    box.innerHTML = '<em style="color:#666">Buscando...</em>';
+    try {
+      const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(s.tmdb)}&query=${encodeURIComponent(q)}&language=${lang}&include_adult=false`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      render(d.results || []);
+    } catch (e) { box.innerHTML = `<em style="color:var(--danger)">${e.message}</em>`; }
+  }
+
+  function render(list) {
+    const box = document.getElementById('tmdb-results');
+    if (list.length === 0) { box.innerHTML = '<em style="color:#666">Sin resultados.</em>'; return; }
+    box.innerHTML = '';
+    list.slice(0, 18).forEach(m => {
+      const d = document.createElement('div');
+      d.className = 'tmdb-result';
+      const poster = m.poster_path ? `https://image.tmdb.org/t/p/w200${m.poster_path}` : '';
+      d.innerHTML = `
+        ${poster ? `<img src="${poster}" loading="lazy">` : '<div style="aspect-ratio:2/3;background:#222;display:flex;align-items:center;justify-content:center;color:#555">🎬</div>'}
+        <div class="info">
+          <div style="font-weight:700">${esc(m.title)}</div>
+          <div style="color:#888">${(m.release_date || '').slice(0,4)}</div>
+        </div>`;
+      d.onclick = () => select(m.id);
+      box.appendChild(d);
+    });
+  }
+
+  async function select(id) {
+    const s = Settings.get();
+    const lang = document.getElementById('tmdb-lang').value;
+    try {
+      const r = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${s.tmdb}&language=${lang}&append_to_response=credits,videos`);
+      const m = await r.json();
+      fillForm(m);
+      Toast.ok('Cargado de TMDB: ' + m.title);
+      document.getElementById('tmdb-results').innerHTML = '';
+    } catch (e) { Toast.err(e.message); }
+  }
+
+  function fillForm(m) {
+    const setIf = (id, v) => { if (v != null && v !== '') document.getElementById(id).value = v; };
+    setIf('f-title', m.title);
+    if (m.original_title && m.original_title !== m.title) setIf('f-original_title', m.original_title);
+    setIf('f-year', (m.release_date || '').slice(0,4));
+    setIf('f-duration_min', m.runtime);
+    setIf('f-country', (m.production_countries || []).map(c => c.name).join(', '));
+    setIf('f-rating', m.vote_average ? Math.round(m.vote_average * 10) / 10 : '');
+    setIf('f-synopsis', m.overview);
+    setIf('f-tagline', m.tagline);
+    if (m.poster_path) setIf('f-poster_url', `https://image.tmdb.org/t/p/w500${m.poster_path}`);
+    if (m.backdrop_path) setIf('f-backdrop_url', `https://image.tmdb.org/t/p/original${m.backdrop_path}`);
+    const dir = (m.credits && m.credits.crew || []).find(c => c.job === 'Director');
+    if (dir) setIf('f-director', dir.name);
+    if (m.genres && m.genres.length) TagsInput.setAll('genres', m.genres.map(g => g.name));
+    // Trailer YouTube si hay
+    const trailer = (m.videos && m.videos.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube');
+    if (trailer) setIf('f-trailer_url', `https://www.youtube.com/watch?v=${trailer.key}`);
+  }
+  return { search, select };
+})();
+
+/* =================================================================
+   TAGS INPUT — para genres y subtitles
+================================================================= */
+const TagsInput = (() => {
+  const state = { genres: [], subtitles: [] };
+
+  function init() {
+    document.querySelectorAll('[data-tags-for]').forEach(input => {
+      const key = input.dataset.tagsFor;
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          addOne(key, input.value);
+          input.value = '';
+        } else if (e.key === 'Backspace' && !input.value && state[key].length) {
+          state[key].pop();
+          render(key);
+        }
+      });
+    });
+  }
+  function addOne(key, val) {
+    val = val.trim().replace(/,$/, '');
+    if (!val) return;
+    if (state[key].indexOf(val) >= 0) return;
+    state[key].push(val);
+    render(key);
+  }
+  function remove(key, idx) {
+    state[key].splice(idx, 1);
+    render(key);
+  }
+  function setAll(key, arr) {
+    state[key] = Array.isArray(arr) ? arr.slice() : [];
+    render(key);
+  }
+  function get(key) { return state[key].slice(); }
+  function clear() { state.genres = []; state.subtitles = []; render('genres'); render('subtitles'); }
+  function render(key) {
+    const wrap = document.getElementById('f-' + key);
+    if (!wrap) return;
+    const input = wrap.querySelector('input');
+    wrap.querySelectorAll('.tag-chip').forEach(c => c.remove());
+    state[key].forEach((v, i) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `${esc(v)} <button type="button" aria-label="Quitar">×</button>`;
+      chip.querySelector('button').onclick = () => remove(key, i);
+      wrap.insertBefore(chip, input);
+    });
+  }
+  return { init, setAll, get, clear };
+})();
+
+/* =================================================================
+   MOVIE FORM — modal de alta/edición
+================================================================= */
+const MovieForm = (() => {
+  let editingId = null;
+
+  function openNew() {
+    editingId = null;
+    document.getElementById('modal-title').textContent = 'Nueva película';
+    resetForm();
+    document.getElementById('f-added_at').value = new Date().toISOString().slice(0,10);
+    show();
+  }
+  function openEdit(movie) {
+    editingId = movie.id;
+    document.getElementById('modal-title').textContent = 'Editar: ' + movie.title;
+    resetForm();
+    fill(movie);
+    show();
+  }
+  function show() {
+    document.getElementById('movie-modal').classList.remove('hidden');
+    refreshCatDatalist();
+    setTimeout(() => document.getElementById('f-title').focus(), 50);
+  }
+  function close() {
+    document.getElementById('movie-modal').classList.add('hidden');
+    document.getElementById('tmdb-results').innerHTML = '';
+    document.getElementById('tmdb-q').value = '';
+  }
+  function resetForm() {
+    const ids = ['title','video_url','original_title','year','duration_min','director','country',
+                 'language','quality','rating','size_gb','category','tagline','synopsis',
+                 'poster_url','backdrop_url','trailer_url','source','added_by','id','added_at'];
+    ids.forEach(i => { const el = document.getElementById('f-'+i); if (el) el.value = ''; });
+    document.getElementById('f-featured').checked = false;
+    TagsInput.clear();
+    document.querySelectorAll('.field.invalid').forEach(f => f.classList.remove('invalid'));
+  }
+  function fill(m) {
+    const setV = (k) => { const el = document.getElementById('f-'+k); if (el && m[k] != null) el.value = m[k]; };
+    ['title','video_url','original_title','year','duration_min','director','country','language',
+     'quality','rating','size_gb','category','tagline','synopsis','poster_url','backdrop_url',
+     'trailer_url','source','added_by','id','added_at'].forEach(setV);
+    document.getElementById('f-featured').checked = !!m.featured;
+    TagsInput.setAll('genres', m.genres || []);
+    TagsInput.setAll('subtitles', m.subtitles || []);
+  }
+  function validate() {
+    let ok = true;
+    document.querySelectorAll('.field.invalid').forEach(f => f.classList.remove('invalid'));
+    const req = ['title', 'video_url'];
+    req.forEach(k => {
+      const el = document.getElementById('f-'+k);
+      if (!el.value.trim()) { el.closest('.field').classList.add('invalid'); ok = false; }
+    });
+    return ok;
+  }
+  function build() {
+    const get = k => {
+      const el = document.getElementById('f-'+k);
+      if (!el) return null;
+      const v = el.value.trim();
+      return v === '' ? null : v;
+    };
+    const num = k => { const v = get(k); return v == null ? null : parseFloat(v); };
+    const int = k => { const v = get(k); return v == null ? null : parseInt(v, 10); };
+
+    const title = get('title');
+    let id = get('id');
+    if (!id) {
+      const y = int('year');
+      id = slug(title) + (y ? '-' + y : '');
+    }
+    const m = {
+      id,
+      title,
+      original_title: get('original_title'),
+      year: int('year'),
+      duration_min: int('duration_min'),
+      director: get('director'),
+      country: get('country'),
+      language: get('language'),
+      subtitles: TagsInput.get('subtitles'),
+      genres: TagsInput.get('genres'),
+      category: get('category'),
+      rating: num('rating'),
+      quality: get('quality'),
+      size_gb: num('size_gb'),
+      synopsis: get('synopsis'),
+      tagline: get('tagline'),
+      poster_url: get('poster_url'),
+      backdrop_url: get('backdrop_url'),
+      video_url: get('video_url'),
+      trailer_url: get('trailer_url'),
+      source: get('source'),
+      added_by: get('added_by'),
+      added_at: get('added_at') || new Date().toISOString().slice(0,10),
+      featured: document.getElementById('f-featured').checked
+    };
+    // Limpiar vacíos/nulos
+    Object.keys(m).forEach(k => {
+      if (m[k] === null || m[k] === undefined || m[k] === '') delete m[k];
+      if (Array.isArray(m[k]) && m[k].length === 0) delete m[k];
+    });
+    if (m.featured === false) delete m.featured;
+    return m;
+  }
+  async function save() {
+    if (!validate()) return Toast.err('Revisá los campos obligatorios');
+    const btn = document.getElementById('save-movie-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Guardando...';
+    try {
+      const movie = build();
+      await App.upsertMovie(movie, editingId);
+      close();
+      Toast.ok(editingId ? 'Película actualizada' : 'Película agregada');
+    } catch (e) {
+      Toast.err('Error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '💾 Guardar';
+    }
+  }
+  function refreshCatDatalist() {
+    const dl = document.getElementById('cat-list');
+    dl.innerHTML = '';
+    (App.getCategories() || []).forEach(c => {
+      const o = document.createElement('option'); o.value = c; dl.appendChild(o);
+    });
+  }
+  return { openNew, openEdit, close, save };
+})();
+
+/* =================================================================
+   CONFIRM MODAL
+================================================================= */
+const Confirm = (() => {
+  let onOk = null;
+  function show(text, details, cb) {
+    document.getElementById('confirm-text').textContent = text;
+    document.getElementById('confirm-movie').innerHTML = details;
+    onOk = cb;
+    document.getElementById('confirm-modal').classList.remove('hidden');
+  }
+  function close() {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    onOk = null;
+  }
+  document.getElementById('confirm-ok-btn').onclick = async () => {
+    const cb = onOk;
+    close();
+    if (cb) await cb();
+  };
+  return { show, close };
+})();
+
+/* =================================================================
+   APP — estado + render de la lista
+================================================================= */
+const App = (() => {
+  let catalog = { version: '1.0', updated_at: null, categories: [], movies: [] };
+  let filename = 'catalog.json';
+
+  async function init() {
+    Settings.show(false);
+    if (document.getElementById('admin-view').classList.contains('hidden')) return;
+    await reload();
+    wireFilters();
+  }
+
+  async function reload() {
+    setStatus('Cargando...', '');
+    try {
+      const { filename: fn, data } = await GistAPI.read();
+      filename = fn;
+      // Normalizar estructura
+      if (!data.movies) data.movies = [];
+      if (!data.categories) data.categories = [];
+      if (!data.version) data.version = '1.0';
+      catalog = data;
+      setStatus('✓ Cargado', 'ok');
+      render();
+    } catch (e) {
+      setStatus('Error: ' + e.message, 'err');
+      Toast.err(e.message);
+    }
+  }
+
+  async function save() {
+    setStatus('Guardando...', '');
+    try {
+      catalog.updated_at = new Date().toISOString();
+      // Deriva categorías actuales
+      const cats = new Set(catalog.categories || []);
+      (catalog.movies || []).forEach(m => { if (m.category) cats.add(m.category); });
+      catalog.categories = Array.from(cats);
+      await GistAPI.write(filename, catalog);
+      setStatus('✓ Guardado ' + new Date().toLocaleTimeString(), 'ok');
+    } catch (e) {
+      setStatus('Error al guardar', 'err');
+      throw e;
+    }
+  }
+
+  async function upsertMovie(movie, editingId) {
+    if (editingId) {
+      const idx = catalog.movies.findIndex(m => m.id === editingId);
+      if (idx >= 0) catalog.movies[idx] = movie;
+      else catalog.movies.push(movie);
+    } else {
+      // Detectar id duplicado
+      if (catalog.movies.some(m => m.id === movie.id)) {
+        movie.id += '-' + Date.now().toString(36);
+      }
+      catalog.movies.push(movie);
+    }
+    await save();
+    render();
+  }
+
+  async function deleteMovie(id) {
+    catalog.movies = catalog.movies.filter(m => m.id !== id);
+    await save();
+    render();
+  }
+
+  function render() {
+    const q = (document.getElementById('q-filter').value || '').toLowerCase();
+    const cat = document.getElementById('cat-filter').value;
+    const feat = document.getElementById('feat-filter').value;
+
+    const movies = (catalog.movies || []).filter(m => {
+      if (cat && m.category !== cat) return false;
+      if (feat === 'yes' && !m.featured) return false;
+      if (feat === 'no' && m.featured) return false;
+      if (q) {
+        const hay = [m.title, m.original_title, m.director, m.year, m.category, m.source]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+
+    const list = document.getElementById('movie-list');
+    const empty = document.getElementById('empty-state');
+    list.innerHTML = '';
+    if (movies.length === 0) {
+      list.classList.add('hidden');
+      empty.classList.remove('hidden');
+      empty.querySelector('h2').textContent = (catalog.movies || []).length === 0
+        ? 'El catálogo está vacío'
+        : 'Ninguna coincide con los filtros';
+    } else {
+      list.classList.remove('hidden');
+      empty.classList.add('hidden');
+      movies.forEach(m => list.appendChild(buildCard(m)));
+    }
+
+    // Contador
+    document.getElementById('count').textContent =
+      `${movies.length} de ${(catalog.movies || []).length} pelis`;
+
+    // Dropdown categorías
+    const catSel = document.getElementById('cat-filter');
+    const prev = catSel.value;
+    catSel.innerHTML = '<option value="">Todas las categorías</option>';
+    (catalog.categories || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      if (c === prev) o.selected = true;
+      catSel.appendChild(o);
+    });
+  }
+
+  function buildCard(m) {
+    const d = document.createElement('div');
+    d.className = 'movie-card';
+    const poster = m.poster_url
+      ? `<div class="movie-poster" style="background-image:url('${esc(m.poster_url)}')"></div>`
+      : `<div class="movie-poster empty">🎬</div>`;
+    const sub = [
+      m.year, m.director, m.duration_min ? m.duration_min + ' min' : null, m.quality
+    ].filter(Boolean).join(' · ');
+    const tags = [];
+    if (m.category) tags.push(`<span class="tag cat">${esc(m.category)}</span>`);
+    (m.genres || []).slice(0, 3).forEach(g => tags.push(`<span class="tag">${esc(g)}</span>`));
+    d.innerHTML = `
+      ${poster}
+      ${m.featured ? '<div class="movie-featured">★ DESTACADA</div>' : ''}
+      <div class="movie-body">
+        <div class="movie-title">${esc(m.title)}</div>
+        <div class="movie-sub">${esc(sub)}</div>
+        <div class="movie-tags">${tags.join('')}</div>
+        <div class="movie-actions">
+          <button class="btn secondary" data-act="edit">✏️ Editar</button>
+          <button class="btn danger" data-act="delete">🗑️</button>
+        </div>
       </div>`;
-    div.onclick = () => selectMovie(m);
-    el.appendChild(div);
-  });
-}
-
-async function selectMovie(m) {
-  const key = document.getElementById('tmdb-key').value.trim();
-  const lang = document.getElementById('search-lang').value;
-  try {
-    const res = await fetch(`https://api.themoviedb.org/3/movie/${m.id}?api_key=${key}&language=${lang}&append_to_response=credits`);
-    const full = await res.json();
-    selected = full;
-    toast('Cargada: ' + full.title);
-    regenerate();
-  } catch (e) {
-    toast('Error: ' + e.message);
+    d.querySelector('[data-act="edit"]').onclick = () => MovieForm.openEdit(m);
+    d.querySelector('[data-act="delete"]').onclick = () => askDelete(m);
+    return d;
   }
-}
 
-function slugify(s) {
+  function askDelete(m) {
+    Confirm.show(
+      '¿Eliminar esta película del catálogo? La acción es inmediata y se sincroniza al Gist.',
+      `<b>${esc(m.title)}</b>${m.year ? ' (' + m.year + ')' : ''}<br><small style="color:#888">${esc(m.video_url || '')}</small>`,
+      async () => {
+        try {
+          await deleteMovie(m.id);
+          Toast.ok('Película eliminada');
+        } catch (e) { Toast.err(e.message); }
+      }
+    );
+  }
+
+  function wireFilters() {
+    ['q-filter','cat-filter','feat-filter'].forEach(id => {
+      document.getElementById(id).addEventListener('input', render);
+    });
+  }
+
+  function setStatus(msg, cls) {
+    const el = document.getElementById('save-status');
+    el.textContent = msg;
+    el.className = 'status ' + (cls || '');
+  }
+
+  function getCategories() { return catalog.categories || []; }
+
+  return { init, reload, upsertMovie, deleteMovie, getCategories };
+})();
+
+/* =================================================================
+   TOAST + utils
+================================================================= */
+const Toast = (() => {
+  const el = document.getElementById('toast');
+  let t = null;
+  function show(msg, isErr) {
+    clearTimeout(t);
+    el.textContent = msg;
+    el.className = 'toast' + (isErr ? ' err' : '') + ' visible';
+    t = setTimeout(() => el.classList.remove('visible'), 3500);
+  }
+  return { ok: m => show(m, false), err: m => show(m, true) };
+})();
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function slug(s) {
   return (s || '').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 50);
 }
 
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function regenerate() {
-  if (!selected) return;
-  const m = selected;
-  const year = parseInt((m.release_date || '').slice(0,4), 10) || null;
-  const id = slugify(m.title) + (year ? '-' + year : '');
-  const director = (m.credits && m.credits.crew || []).find(c => c.job === 'Director');
-  const subs = document.getElementById('subtitles').value.split(',').map(s => s.trim()).filter(Boolean);
-
-  const obj = {
-    id,
-    title: m.title,
-    original_title: m.original_title !== m.title ? m.original_title : undefined,
-    year,
-    duration_min: m.runtime || null,
-    director: director ? director.name : null,
-    country: (m.production_countries || []).map(c => c.name).join(', ') || null,
-    language: document.getElementById('language').value || null,
-    subtitles: subs.length ? subs : undefined,
-    genres: (m.genres || []).map(g => g.name),
-    category: document.getElementById('category').value || null,
-    rating: m.vote_average ? Math.round(m.vote_average * 10) / 10 : null,
-    quality: document.getElementById('quality').value || null,
-    size_gb: parseFloat(document.getElementById('size-gb').value) || null,
-    synopsis: m.overview || '',
-    tagline: m.tagline || null,
-    poster_url: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : null,
-    backdrop_url: m.backdrop_path ? `https://image.tmdb.org/t/p/original${m.backdrop_path}` : null,
-    video_url: document.getElementById('video-url').value.trim(),
-    trailer_url: null,
-    source: document.getElementById('source').value || null,
-    added_by: document.getElementById('added-by').value || null,
-    added_at: new Date().toISOString().slice(0, 10),
-    featured: document.getElementById('featured').checked
-  };
-
-  // Limpia nulos/vacíos/undefined para un JSON limpio
-  Object.keys(obj).forEach(k => {
-    if (obj[k] === null || obj[k] === undefined || obj[k] === '' ||
-        (Array.isArray(obj[k]) && obj[k].length === 0)) {
-      delete obj[k];
-    }
-  });
-
-  document.getElementById('output').textContent = JSON.stringify(obj, null, 2);
-}
-
-async function copyOutput() {
-  try {
-    await navigator.clipboard.writeText(document.getElementById('output').textContent);
-    toast('¡Copiado! Pegá al Gist.');
-  } catch (e) {
-    toast('No se pudo copiar: ' + e.message);
-  }
-}
+/* =================================================================
+   BOOT
+================================================================= */
+TagsInput.init();
+App.init();
 </script>
 </body>
 </html>
