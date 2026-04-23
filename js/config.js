@@ -7,7 +7,7 @@
  */
 window.APP_CONFIG = {
   // URL raw del Gist. Reemplazar con la real después de crearlo.
-  CATALOG_URL: 'https://gist.githubusercontent.com/malcofa/REPLACE_GIST_ID/raw/catalog.json',
+  CATALOG_URL: 'https://gist.githubusercontent.com/malcofa/b74171318151c72fd3be5941e28716d2/raw/catalog.json',
 
   // Cache local del catálogo (minutos). Evita pegarle a Gist en cada apertura.
   CACHE_TTL_MINUTES: 5,
