@@ -263,8 +263,8 @@
 
     <div class="field">
       <label class="required">Gist ID</label>
-      <input id="s-gist" placeholder="b74171318151c72fd3be5941e28716d2">
-      <span class="hint">Es el hash largo en la URL del Gist (gist.github.com/usuario/<b>HASH</b>)</span>
+      <input id="s-gist" value="b74171318151c72fd3be5941e28716d2">
+      <span class="hint">Pre-cargado con tu Gist (<code>b74171318151c72fd3be5941e28716d2</code>). Si querés usar otro, pegalo acá. Es el hash en la URL: <code>gist.github.com/usuario/<b>HASH</b></code></span>
     </div>
 
     <div class="field">
@@ -529,9 +529,11 @@ const Settings = (() => {
     settingsView.classList.toggle('hidden', !needSetup);
     adminView.classList.toggle('hidden', needSetup);
     if (needSetup) {
-      document.getElementById('s-pat').value = data.pat || '';
-      document.getElementById('s-gist').value = data.gist || '';
-      document.getElementById('s-tmdb').value = data.tmdb || '';
+      // Solo sobreescribir si hay valor guardado — así respetamos el default del HTML.
+      const gistEl = document.getElementById('s-gist');
+      if (data.pat) document.getElementById('s-pat').value = data.pat;
+      if (data.gist) gistEl.value = data.gist;
+      if (data.tmdb) document.getElementById('s-tmdb').value = data.tmdb;
     }
   }
   function get() { return data; }
