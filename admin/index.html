@@ -101,12 +101,13 @@
   }
   .movie-list.list-view .movie-card {
     flex-direction: row;
-    height: 130px;
+    height: auto;
+    min-height: 130px;
   }
   .movie-list.list-view .movie-poster {
     flex: 0 0 87px;
     aspect-ratio: 2/3;
-    height: 100%;
+    align-self: stretch;
   }
   .movie-list.list-view .movie-poster.empty { font-size: 30px; }
   .movie-list.list-view .movie-featured {
@@ -118,38 +119,42 @@
   }
   .movie-list.list-view .movie-body {
     flex: 1;
-    padding: 10px 14px;
     min-width: 0;
+    padding: 10px 14px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
   }
   .movie-list.list-view .movie-title {
-    font-size: 16px;
-    margin-bottom: 2px;
+    font-size: 15px;
+    margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .movie-list.list-view .movie-sub {
     font-size: 12px;
-    margin-bottom: 4px;
+    margin: 0;
     min-height: 0;
   }
   .movie-list.list-view .movie-tags {
-    margin-bottom: 4px;
-    max-height: 20px;
-    overflow: hidden;
+    margin: 0;
+    gap: 4px;
   }
-  .movie-list.list-view .card-enrich,
+  .movie-list.list-view .card-enrich {
+    margin: 0;
+  }
   .movie-list.list-view .movie-actions {
     margin-top: auto;
-  }
-  .movie-list.list-view .movie-actions {
     justify-content: flex-end;
+    gap: 6px;
+  }
+  .movie-list.list-view .movie-actions .btn {
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    font-size: 12px;
   }
   @media (max-width: 600px) {
-    .movie-list.list-view .movie-card { height: auto; }
     .movie-list.list-view .movie-poster { flex: 0 0 70px; }
   }
 
