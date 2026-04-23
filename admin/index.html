@@ -253,11 +253,12 @@
     <p class="sub">Necesitamos 3 credenciales para administrar el catálogo. Se guardan solo en este navegador.</p>
 
     <div class="field">
-      <label class="required">GitHub Personal Access Token</label>
+      <label class="required">GitHub Personal Access Token (clásico)</label>
       <input id="s-pat" type="password" placeholder="ghp_...">
       <span class="hint">
-        Crear en <a href="https://github.com/settings/tokens?type=beta" target="_blank">github.com/settings/tokens</a>
-        · tipo <b>Fine-grained</b> · scope: <b>Gists (Read and write)</b>
+        Crear en <a href="https://github.com/settings/tokens/new?scopes=gist&description=Cinema%20Cl%C3%A1sico%20Admin" target="_blank">github.com/settings/tokens/new</a>
+        · tipo <b>Classic</b> · único scope: <b>gist</b>
+        <br>⚠️ Usá <b>Classic</b>, no Fine-grained. Los fine-grained aún no soportan la API de Gists (dan 403).
       </span>
     </div>
 

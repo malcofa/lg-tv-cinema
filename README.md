@@ -112,7 +112,7 @@ Mini-app web para editar el catálogo sin tocar JSON a mano.
 ### Setup inicial (una vez)
 
 1. Abrí https://malcofa.github.io/lg-tv-cinema/admin/
-2. **GitHub PAT**: crear en https://github.com/settings/tokens?type=beta → Fine-grained → scope `Gists: Read and write`
+2. **GitHub PAT**: crear en https://github.com/settings/tokens/new?scopes=gist → **Classic** (NO fine-grained, dan 403 en Gist API) → scope: `gist`
 3. **Gist ID**: ya viene pre-cargado (`b74171318151c72fd3be5941e28716d2`)
 4. **TMDB Key** (opcional): https://www.themoviedb.org/settings/api
 
