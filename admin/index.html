@@ -274,6 +274,16 @@
       <span class="hint">Opcional. Sacala de <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a></span>
     </div>
 
+    <div class="field">
+      <label>OMDb API Key</label>
+      <input id="s-omdb" placeholder="(opcional) alternativa a TMDB">
+      <span class="hint">
+        Alternativa si TMDB te da 403 (geo-block). Pedí la free en
+        <a href="https://www.omdbapi.com/apikey.aspx" target="_blank">omdbapi.com/apikey.aspx</a>
+        → opción <b>FREE (1000 req/día)</b>. Te la envían por email en minutos.
+      </span>
+    </div>
+
     <div style="display:flex; gap: 10px; margin-top: 20px;">
       <button class="btn" onclick="Settings.save()">Guardar y continuar</button>
       <button class="btn ghost" onclick="Settings.clear()" style="margin-left:auto">Borrar todo</button>
@@ -334,7 +344,11 @@
           <button class="btn secondary" onclick="TMDB.search()">Buscar</button>
         </div>
         <div style="font-size:11px; color:var(--muted); margin-top:6px">
-          Tip: si pegás una URL como <code>themoviedb.org/movie/1086260</code> carga directo sin buscar.
+          Podés pegar:
+          <b>URL de TMDB</b> (<code>themoviedb.org/movie/1086260</code>) ·
+          <b>URL de IMDb</b> (<code>imdb.com/title/tt0013442</code>) ·
+          <b>ID numérico</b> TMDB · <b>ID IMDb</b> (<code>tt0013442</code>) ·
+          o simplemente <b>el título</b>.
         </div>
         <div id="tmdb-results" class="tmdb-results"></div>
       </div>
@@ -519,8 +533,9 @@ const Settings = (() => {
     const pat = document.getElementById('s-pat').value.trim();
     const gist = document.getElementById('s-gist').value.trim();
     const tmdb = document.getElementById('s-tmdb').value.trim();
+    const omdb = document.getElementById('s-omdb').value.trim();
     if (!pat || !gist) return Toast.err('PAT y Gist ID son obligatorios');
-    data = { pat, gist, tmdb };
+    data = { pat, gist, tmdb, omdb };
     localStorage.setItem(KEY, JSON.stringify(data));
     show(false);
     App.init();
@@ -543,6 +558,7 @@ const Settings = (() => {
       if (data.pat) document.getElementById('s-pat').value = data.pat;
       if (data.gist) gistEl.value = data.gist;
       if (data.tmdb) document.getElementById('s-tmdb').value = data.tmdb;
+      if (data.omdb) document.getElementById('s-omdb').value = data.omdb;
     }
   }
   function get() { return data; }
@@ -598,7 +614,13 @@ const GistAPI = (() => {
 })();
 
 /* =================================================================
-   TMDB — búsqueda + fetch detallado
+   TMDB + OMDb — búsqueda + fetch detallado
+   El botón "Buscar" dispatchea según el tipo de input:
+     - URL de themoviedb.org → TMDB por ID
+     - URL de imdb.com       → OMDb por IMDB ID
+     - Solo dígitos          → TMDB por ID
+     - ttXXXXXXX             → OMDb por IMDB ID
+     - Otra cosa (título)    → TMDB primero, OMDb fallback
 ================================================================= */
 const TMDB = (() => {
   async function search() {
@@ -606,31 +628,52 @@ const TMDB = (() => {
     const q = document.getElementById('tmdb-q').value.trim();
     const lang = document.getElementById('tmdb-lang').value;
     const box = document.getElementById('tmdb-results');
-    if (!s.tmdb) return Toast.err('Configurá tu TMDB API key en ⚙️');
     if (!q) return Toast.err('Escribí algo para buscar');
+    if (!s.tmdb && !s.omdb) return Toast.err('Configurá TMDB o OMDb key en ⚙️');
 
-    // Detectar URL de TMDB o ID numérico → ir directo al detalle
-    const urlMatch = q.match(/themoviedb\.org\/movie\/(\d+)/i);
-    const idMatch = /^\d+$/.test(q);
-    if (urlMatch || idMatch) {
-      const id = urlMatch ? urlMatch[1] : q;
-      box.innerHTML = '<em style="color:#666">Cargando peli por ID ' + id + '...</em>';
-      try {
-        await select(id);
-        box.innerHTML = '';
-      } catch (e) {
-        box.innerHTML = `<em style="color:var(--danger)">${e.message}</em>`;
-      }
+    // Detectar URL/ID de TMDB
+    const tmdbUrl = q.match(/themoviedb\.org\/movie\/(\d+)/i);
+    const tmdbId = /^\d+$/.test(q);
+    if (tmdbUrl || tmdbId) {
+      if (!s.tmdb) return Toast.err('Necesitas TMDB key para IDs numéricos');
+      const id = tmdbUrl ? tmdbUrl[1] : q;
+      box.innerHTML = '<em style="color:#666">Cargando TMDB ' + id + '...</em>';
+      try { await select(id); box.innerHTML = ''; }
+      catch (e) { box.innerHTML = `<em style="color:var(--danger)">${e.message}</em>`; }
       return;
     }
 
-    box.innerHTML = '<em style="color:#666">Buscando...</em>';
-    try {
-      const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(s.tmdb)}&query=${encodeURIComponent(q)}&language=${lang}&include_adult=false`);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const d = await r.json();
-      render(d.results || []);
-    } catch (e) { box.innerHTML = `<em style="color:var(--danger)">${e.message}</em>`; }
+    // Detectar URL/ID de IMDB
+    const imdbUrl = q.match(/imdb\.com\/title\/(tt\d+)/i);
+    const imdbId = /^tt\d+$/i.test(q);
+    if (imdbUrl || imdbId) {
+      if (!s.omdb) return Toast.err('Necesitas OMDb key para IDs de IMDB');
+      const id = imdbUrl ? imdbUrl[1] : q;
+      box.innerHTML = '<em style="color:#666">Cargando IMDb ' + id + '...</em>';
+      try { await OMDb.selectById(id); box.innerHTML = ''; }
+      catch (e) { box.innerHTML = `<em style="color:var(--danger)">${e.message}</em>`; }
+      return;
+    }
+
+    // Búsqueda por título — TMDB primero, OMDb fallback
+    if (s.tmdb) {
+      box.innerHTML = '<em style="color:#666">Buscando en TMDB...</em>';
+      try {
+        const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(s.tmdb)}&query=${encodeURIComponent(q)}&language=${lang}&include_adult=false`);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        if (d.results && d.results.length > 0) { render(d.results); return; }
+        // sin resultados → seguir con OMDb si hay
+      } catch (e) {
+        if (!s.omdb) { box.innerHTML = `<em style="color:var(--danger)">TMDB: ${e.message}</em>`; return; }
+        // si hay OMDb, seguir
+      }
+    }
+    if (s.omdb) {
+      box.innerHTML = '<em style="color:#666">Buscando en OMDb...</em>';
+      try { await OMDb.searchByTitle(q); }
+      catch (e) { box.innerHTML = `<em style="color:var(--danger)">OMDb: ${e.message}</em>`; }
+    }
   }
 
   function render(list) {
@@ -684,6 +727,75 @@ const TMDB = (() => {
     if (trailer) setIf('f-trailer_url', `https://www.youtube.com/watch?v=${trailer.key}`);
   }
   return { search, select };
+})();
+
+/* =================================================================
+   OMDb — alternativa a TMDB (sin geo-block)
+================================================================= */
+const OMDb = (() => {
+  function base(s) { return 'https://www.omdbapi.com/?apikey=' + encodeURIComponent(s.omdb); }
+
+  async function selectById(imdbId) {
+    const s = Settings.get();
+    if (!s.omdb) throw new Error('OMDb key no configurada');
+    const r = await fetch(base(s) + '&i=' + encodeURIComponent(imdbId) + '&plot=full');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (d.Response === 'False') throw new Error(d.Error || 'No encontrado');
+    fillFromOMDb(d);
+    Toast.ok('Cargado de OMDb: ' + d.Title);
+    document.getElementById('tmdb-results').innerHTML = '';
+  }
+
+  async function searchByTitle(title) {
+    const s = Settings.get();
+    if (!s.omdb) throw new Error('OMDb key no configurada');
+    const r = await fetch(base(s) + '&s=' + encodeURIComponent(title) + '&type=movie');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (d.Response === 'False') {
+      document.getElementById('tmdb-results').innerHTML =
+        `<em style="color:#666">Sin resultados en OMDb: ${esc(d.Error || '')}</em>`;
+      return;
+    }
+    renderList(d.Search || []);
+  }
+
+  function renderList(list) {
+    const box = document.getElementById('tmdb-results');
+    box.innerHTML = '';
+    list.slice(0, 18).forEach(m => {
+      const d = document.createElement('div');
+      d.className = 'tmdb-result';
+      const poster = (m.Poster && m.Poster !== 'N/A') ? m.Poster : '';
+      d.innerHTML = `
+        ${poster ? `<img src="${poster}" loading="lazy">` : '<div style="aspect-ratio:2/3;background:#222;display:flex;align-items:center;justify-content:center;color:#555">🎬</div>'}
+        <div class="info">
+          <div style="font-weight:700">${esc(m.Title)}</div>
+          <div style="color:#888">${esc(m.Year || '')} · IMDb</div>
+        </div>`;
+      d.onclick = () => selectById(m.imdbID).catch(e => Toast.err(e.message));
+      box.appendChild(d);
+    });
+  }
+
+  function fillFromOMDb(m) {
+    const ok = v => v != null && v !== '' && v !== 'N/A';
+    const setIf = (id, v) => { if (ok(v)) document.getElementById(id).value = v; };
+    setIf('f-title', m.Title);
+    setIf('f-year', m.Year);
+    const runtime = parseInt((m.Runtime || '').replace(/[^\d]/g, ''), 10);
+    if (runtime) setIf('f-duration_min', runtime);
+    setIf('f-director', m.Director);
+    setIf('f-country', m.Country);
+    setIf('f-language', m.Language);
+    setIf('f-synopsis', m.Plot);
+    if (ok(m.imdbRating)) setIf('f-rating', m.imdbRating);
+    if (ok(m.Poster)) setIf('f-poster_url', m.Poster);
+    if (ok(m.Genre)) TagsInput.setAll('genres', m.Genre.split(',').map(g => g.trim()).filter(Boolean));
+  }
+
+  return { selectById, searchByTitle };
 })();
 
 /* =================================================================
