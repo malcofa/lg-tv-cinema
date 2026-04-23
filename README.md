@@ -1,4 +1,4 @@
-# Cinema Clásico 🎬
+# Cinema Premium 🎬
 
 Plataforma tipo Netflix para películas de **dominio público** (Public Domain Movies). Tres frentes sobre el mismo catálogo:
 
