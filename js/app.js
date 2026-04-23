@@ -242,6 +242,7 @@
     state.scrollY = window.scrollY;
     document.body.classList.add('modal-open');
     $('detail-modal').classList.remove('hidden');
+    if (global.RemoteNav) global.RemoteNav.setMode('modal');
   }
 
   function renderFeaturedButton(m) {
@@ -460,6 +461,7 @@
     $('detail-modal').classList.add('hidden');
     document.body.classList.remove('modal-open');
     window.scrollTo(0, state.scrollY);
+    if (global.RemoteNav) global.RemoteNav.setMode('home');
   }
 
   /* ================= PLAYER ================= */
@@ -469,6 +471,7 @@
     $('player-title').textContent = m.title || '';
     document.body.classList.add('player-open');
     $('player-overlay').classList.remove('hidden');
+    if (global.RemoteNav) global.RemoteNav.setMode('player');
 
     const isEmbed = global.WebPlayer.isEmbed(m.video_url);
     try {
@@ -491,6 +494,7 @@
     global.WebPlayer.stop();
     $('player-overlay').classList.add('hidden');
     document.body.classList.remove('player-open');
+    if (global.RemoteNav) global.RemoteNav.setMode('home');
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
@@ -582,6 +586,13 @@
     window.addEventListener('popstate', () => {
       if (!$('player-overlay').classList.contains('hidden')) closePlayer();
       else if (!$('detail-modal').classList.contains('hidden')) closeDetail();
+    });
+
+    // Back del mando (via RemoteNav, keyCodes 461/10009) o Esc desde nav
+    window.addEventListener('tv-back', () => {
+      if (!$('player-overlay').classList.contains('hidden')) closePlayer();
+      else if (!$('detail-modal').classList.contains('hidden')) closeDetail();
+      else if ($('search-bar').classList.contains('open')) closeSearch();
     });
 
     load();
