@@ -345,8 +345,13 @@
 
         <div class="field full">
           <label class="required">URL del video</label>
-          <input id="f-video_url" required placeholder="https://archive.org/download/.../peli.mp4">
-          <span class="hint">La URL directa al .mp4 (o .m3u8). Es lo que reproduce la TV.</span>
+          <input id="f-video_url" required placeholder="https://archive.org/download/.../peli.mp4  ·  o  ·  https://sitio.com/player/XXXX/">
+          <span class="hint">
+            Se acepta cualquiera de las dos:<br>
+            • <b>URL directa al archivo</b> (.mp4, .m3u8, .webm) — reproduce con el player nativo<br>
+            • <b>URL de reproductor externo</b> (página de un player embebido) — se carga en iframe<br>
+            La detección es automática por la extensión.
+          </span>
           <span class="err">La URL del video es obligatoria</span>
         </div>
 

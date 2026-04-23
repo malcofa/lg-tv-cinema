@@ -111,6 +111,11 @@
   <button class="player-close" id="player-close" aria-label="Cerrar">✕</button>
   <div class="player-container">
     <video id="player-video" controls playsinline></video>
+    <iframe id="player-iframe" class="hidden"
+      allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+      allowfullscreen
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups-to-escape-sandbox"
+      referrerpolicy="no-referrer"></iframe>
     <div class="player-title-bar">
       <h3 id="player-title"></h3>
     </div>

@@ -378,11 +378,15 @@ button {
    Player
    ============================================ */
 #player { background: #000; }
-#video {
+#video, #video-iframe {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  border: 0;
+  background: #000;
+  display: block;
 }
+#video.hidden, #video-iframe.hidden { display: none; }
 .player-overlay {
   position: absolute;
   inset: 0;

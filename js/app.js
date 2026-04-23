@@ -241,16 +241,22 @@
     $('player-title').textContent = m.title || '';
     document.body.classList.add('player-open');
     $('player-overlay').classList.remove('hidden');
+
+    const isEmbed = global.WebPlayer.isEmbed(m.video_url);
     try {
       await global.WebPlayer.play(m.video_url);
     } catch (e) {
       toast('Error al reproducir: ' + e.message, 5000);
       closePlayer();
+      return;
     }
-    // Fullscreen si es posible (desktop)
-    const c = $('player-overlay');
-    if (c.requestFullscreen) {
-      try { await c.requestFullscreen(); } catch (e) {}
+    // Fullscreen solo para video directo. Los reproductores embebidos tienen
+    // su propio botón de fullscreen (y algunos rompen si el iframe entra a fullscreen del documento).
+    if (!isEmbed) {
+      const c = $('player-overlay');
+      if (c.requestFullscreen) {
+        try { await c.requestFullscreen(); } catch (e) {}
+      }
     }
   }
   function closePlayer() {

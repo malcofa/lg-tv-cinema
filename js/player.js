@@ -22,6 +22,20 @@
     return /\.m3u8(\?|$)/i.test(url);
   }
 
+  /**
+   * Detecta si una URL es un reproductor externo (página con player embebido)
+   * en vez de un archivo de video directo.
+   */
+  function isEmbed(url) {
+    if (!url) return false;
+    // Archivos de video directos conocidos
+    if (/\.(mp4|m3u8|webm|mov|mkv|ogv|avi)(\?|$|#)/i.test(url)) return false;
+    // Servicios directos de Internet Archive u hosting de archivos
+    if (/\/download\//i.test(url)) return false;
+    // Todo lo demás: asumimos que es una página de reproductor
+    return true;
+  }
+
   async function setupHLS(video, url) {
     if (!hlsLoaded) {
       await loadScript(HLS_CDN);
@@ -44,6 +58,22 @@
 
   async function play(url) {
     const video = document.getElementById('player-video');
+    const iframe = document.getElementById('player-iframe');
+
+    if (isEmbed(url)) {
+      // Modo embed: ocultar video, mostrar iframe
+      stopVideo();
+      video.classList.add('hidden');
+      iframe.classList.remove('hidden');
+      iframe.src = url;
+      return true;
+    }
+
+    // Modo directo: ocultar iframe, usar video
+    iframe.src = 'about:blank';
+    iframe.classList.add('hidden');
+    video.classList.remove('hidden');
+
     try {
       if (hls) { hls.destroy(); hls = null; }
       if (isHLS(url)) {
@@ -53,17 +83,14 @@
       }
       video.load();
       const p = video.play();
-      if (p && p.catch) {
-        // Autoplay puede ser bloqueado — el usuario pulsará play manualmente
-        p.catch(() => {});
-      }
+      if (p && p.catch) p.catch(() => {});
       return true;
     } catch (e) {
       throw e;
     }
   }
 
-  function stop() {
+  function stopVideo() {
     const video = document.getElementById('player-video');
     try {
       video.pause();
@@ -73,5 +100,11 @@
     if (hls) { try { hls.destroy(); } catch(e) {} hls = null; }
   }
 
-  global.WebPlayer = { play, stop };
+  function stop() {
+    stopVideo();
+    const iframe = document.getElementById('player-iframe');
+    try { iframe.src = 'about:blank'; } catch (e) {}
+  }
+
+  global.WebPlayer = { play, stop, isEmbed };
 })(window);
