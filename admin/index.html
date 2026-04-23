@@ -537,6 +537,15 @@
             </label>
           </div>
         </div>
+
+        <div class="field full">
+          <div class="checkbox-field">
+            <input type="checkbox" id="bulk-skip-dupes" checked>
+            <label for="bulk-skip-dupes" style="font-size:14px; color:var(--text); margin:0; cursor:pointer;">
+              🔁 Saltar duplicados automáticamente (detecta por título, ignora tildes/año/artículos)
+            </label>
+          </div>
+        </div>
       </div>
 
       <div id="bulk-preview" style="margin-top: 16px;"></div>
@@ -1040,13 +1049,36 @@ const MovieForm = (() => {
 
 /* =================================================================
    BULK IMPORT — importa múltiples pelis a la vez con formato
-   "Título | URL" (una por línea)
+   "Título | URL" (una por línea). Detecta duplicados por título
+   normalizado (sin tildes, sin artículo inicial, sin año, etc.)
 ================================================================= */
 const BulkImport = (() => {
   let parsed = [];
+  let duplicates = [];
+
+  /**
+   * Normaliza un título para comparación:
+   *  - lowercase, sin tildes
+   *  - saca artículos iniciales (el/la/los/las/the/a/an/un/una)
+   *  - saca año al final (1888-2099)
+   *  - saca puntuación
+   *  - colapsa espacios
+   */
+  function normalizeTitle(s) {
+    if (!s) return '';
+    return String(s)
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b/g, ' ')
+      .replace(/^\s*(el|la|los|las|the|a|an|un|una)\s+/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
 
   function open() {
     parsed = [];
+    duplicates = [];
     document.getElementById('bulk-input').value = '';
     document.getElementById('bulk-preview').innerHTML = '';
     document.getElementById('bulk-submit-btn').disabled = true;
@@ -1114,9 +1146,49 @@ const BulkImport = (() => {
     return { movies, errors };
   }
 
+  /**
+   * Detecta duplicados:
+   *  - "existing": título coincide con alguna peli ya en el catálogo
+   *  - "batch": dos líneas del mismo batch son dupes entre sí
+   *  - "video_url": la URL exacta ya existe en el catálogo
+   */
+  function detectDuplicates(movies) {
+    const existingMovies = App.getMovies();
+    const normMap = new Map(); // norm -> existing movie
+    const urlMap = new Map();  // url  -> existing movie
+    existingMovies.forEach(m => {
+      const n = normalizeTitle(m.title);
+      if (n) normMap.set(n, m);
+      if (m.video_url) urlMap.set(m.video_url.toLowerCase(), m);
+    });
+
+    const batchNormSeen = new Map(); // norm -> index del batch
+    const dupes = [];
+    movies.forEach((m, i) => {
+      const n = normalizeTitle(m.title);
+      const u = (m.video_url || '').toLowerCase();
+
+      if (urlMap.has(u)) {
+        dupes.push({ idx: i, type: 'url', matchesExisting: urlMap.get(u), reason: 'Misma URL ya existe' });
+      } else if (n && normMap.has(n)) {
+        dupes.push({ idx: i, type: 'title', matchesExisting: normMap.get(n), reason: 'Título similar ya existe' });
+      } else if (n && batchNormSeen.has(n)) {
+        dupes.push({ idx: i, type: 'batch', matchesIdx: batchNormSeen.get(n), reason: 'Título duplicado dentro del lote' });
+      } else if (n) {
+        batchNormSeen.set(n, i);
+      }
+    });
+    return dupes;
+  }
+
   function preview() {
     const { movies, errors } = parseLines();
-    parsed = movies;
+    const skip = document.getElementById('bulk-skip-dupes').checked;
+    duplicates = detectDuplicates(movies);
+    const dupeIdx = new Set(duplicates.map(d => d.idx));
+    // si skip está activo, parsed excluye las duplicadas
+    parsed = skip ? movies.filter((_, i) => !dupeIdx.has(i)) : movies;
+
     const box = document.getElementById('bulk-preview');
     let html = '';
 
@@ -1130,21 +1202,44 @@ const BulkImport = (() => {
       html += '</div>';
     }
 
-    if (movies.length > 0) {
-      html += `<div style="color:var(--success); font-weight:700; margin-bottom:8px">✓ ${movies.length} película(s) listas para importar:</div>`;
+    if (duplicates.length > 0) {
+      const accionEtiqueta = skip ? 'se saltarán' : 'se importarán igual';
+      html += `<div style="color:#ffa500; font-weight:700; margin-bottom:8px">⚠️ ${duplicates.length} posible(s) duplicado(s) — ${accionEtiqueta}:</div>`;
+      html += '<div style="background:#0a0a0f; border:1px solid #ffa500; border-radius:4px; padding:10px; margin-bottom:12px; max-height:160px; overflow-y:auto; font-size:12px;">';
+      duplicates.forEach(d => {
+        const nuevo = movies[d.idx];
+        let contra = '';
+        if (d.type === 'url' || d.type === 'title') {
+          contra = `vs ya en catálogo: <b>${esc(d.matchesExisting.title)}</b>`;
+        } else if (d.type === 'batch') {
+          contra = `vs línea ${d.matchesIdx + 1}: <b>${esc(movies[d.matchesIdx].title)}</b>`;
+        }
+        html += `<div style="padding:4px 0; color:#eee">L${d.idx + 1}: <b>${esc(nuevo.title)}</b> — <span style="color:#ffa500">${esc(d.reason)}</span><br><span style="color:#888; margin-left:20px">${contra}</span></div>`;
+      });
+      html += '</div>';
+    }
+
+    const finales = parsed;
+    if (finales.length > 0) {
+      const skippedNote = skip && duplicates.length > 0
+        ? ` <span style="color:#ffa500">(${duplicates.length} duplicado(s) saltados)</span>`
+        : '';
+      html += `<div style="color:var(--success); font-weight:700; margin-bottom:8px">✓ ${finales.length} película(s) listas para importar:${skippedNote}</div>`;
       html += '<div style="background:#0a0a0f; border:1px solid var(--border); border-radius:4px; padding:10px; max-height:200px; overflow-y:auto; font-size:13px;">';
-      movies.forEach((m, i) => {
+      finales.forEach((m, i) => {
         const cat = m.category ? ` · <span style="color:#6bb6ff">${esc(m.category)}</span>` : '';
         html += `<div style="padding:3px 0">${i + 1}. <b>${esc(m.title)}</b>${cat}</div>`;
       });
       html += '</div>';
       document.getElementById('bulk-submit-btn').disabled = false;
-      document.getElementById('bulk-submit-btn').textContent = `💾 Importar ${movies.length}`;
+      document.getElementById('bulk-submit-btn').textContent = `💾 Importar ${finales.length}`;
     } else {
       document.getElementById('bulk-submit-btn').disabled = true;
       document.getElementById('bulk-submit-btn').textContent = '💾 Importar';
-      if (errors.length === 0) {
+      if (errors.length === 0 && movies.length === 0) {
         html += '<div style="color:var(--muted); text-align:center; padding:20px">No se detectaron películas. Pegá líneas con formato <code>Título | URL</code>.</div>';
+      } else if (skip && duplicates.length > 0 && movies.length === duplicates.length) {
+        html += '<div style="color:var(--muted); text-align:center; padding:20px">Todas las películas son duplicadas. Desmarcá la opción "Saltar duplicados" si querés importarlas igual.</div>';
       }
     }
 
@@ -1153,12 +1248,15 @@ const BulkImport = (() => {
 
   async function submit() {
     if (parsed.length === 0) { preview(); return; }
+    const skippedDupes = document.getElementById('bulk-skip-dupes').checked ? duplicates.length : 0;
     const btn = document.getElementById('bulk-submit-btn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Importando ' + parsed.length + '...';
     try {
       const res = await App.bulkInsert(parsed);
-      Toast.ok(`${res.added} película(s) importadas` + (res.skipped ? ` (${res.skipped} omitidas por ID duplicado)` : ''));
+      let msg = `${res.added} película(s) importadas`;
+      if (skippedDupes > 0) msg += ` · ${skippedDupes} duplicado(s) saltado(s)`;
+      Toast.ok(msg);
       close();
     } catch (e) {
       Toast.err('Error: ' + e.message);
@@ -1384,7 +1482,9 @@ const App = (() => {
 
   function getCategories() { return catalog.categories || []; }
 
-  return { init, reload, upsertMovie, deleteMovie, bulkInsert, getCategories };
+  function getMovies() { return (catalog && catalog.movies) ? catalog.movies.slice() : []; }
+
+  return { init, reload, upsertMovie, deleteMovie, bulkInsert, getCategories, getMovies };
 })();
 
 /* =================================================================
