@@ -224,9 +224,57 @@
 
     $('modal-play').onclick = () => { closeDetail(); openPlayer(m); };
 
+    // Botón admin: destacar / quitar destacada (solo si hay credenciales)
+    renderFeaturedButton(m);
+
     state.scrollY = window.scrollY;
     document.body.classList.add('modal-open');
     $('detail-modal').classList.remove('hidden');
+  }
+
+  function renderFeaturedButton(m) {
+    const actions = document.querySelector('#detail-modal .modal-actions');
+    if (!actions) return;
+    // Quitar cualquier botón admin previo
+    const old = actions.querySelector('.admin-feature-btn');
+    if (old) old.remove();
+
+    if (!global.AdminMode || !global.AdminMode.isEnabled()) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary admin-feature-btn';
+    btn.dataset.featured = m.featured ? '1' : '0';
+    updateFeatBtnLabel(btn, !!m.featured);
+    btn.onclick = async () => {
+      const newValue = !(btn.dataset.featured === '1');
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="btn-icon">…</span> Guardando';
+      try {
+        await global.AdminMode.toggleFeatured(m.id, newValue);
+        // Update in-memory state
+        if (newValue) m.featured = true;
+        else delete m.featured;
+        btn.dataset.featured = newValue ? '1' : '0';
+        updateFeatBtnLabel(btn, newValue);
+        // Re-render hero + grilla para reflejar el cambio
+        renderHero();
+        renderCategories();
+        toast(newValue ? '⭐ Marcada como destacada' : 'Destacada removida');
+      } catch (e) {
+        btn.innerHTML = original;
+        toast('Error: ' + e.message, 5000);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    actions.appendChild(btn);
+  }
+
+  function updateFeatBtnLabel(btn, featured) {
+    btn.innerHTML = featured
+      ? '<span class="btn-icon">★</span> Quitar destacada'
+      : '<span class="btn-icon">☆</span> Destacar';
   }
   function closeDetail() {
     $('detail-modal').classList.add('hidden');
