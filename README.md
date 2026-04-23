@@ -1,8 +1,12 @@
-# Cinema Clásico — App para LG webOS TV
+# Cinema Clásico 🎬
 
-App tipo Netflix para TVs LG (webOS), que lee el catálogo de películas desde un **Gist público** y las reproduce directo desde URLs remotas (Internet Archive, pCloud, OneDrive, etc.).
+Plataforma tipo Netflix para películas de **dominio público** (Public Domain Movies). Tres frentes sobre el mismo catálogo:
 
-Pensada para contenido de **dominio público** (PDM) y material propio.
+| 🌐 URL | Para qué |
+|---|---|
+| https://malcofa.github.io/lg-tv-cinema/ | **Player web público** — responsive, mobile + desktop |
+| https://malcofa.github.io/lg-tv-cinema/tv/ | Preview del app de TV (se instala en LG webOS via `.ipk`) |
+| https://malcofa.github.io/lg-tv-cinema/admin/ | Admin CRUD — edita el catálogo directo al Gist |
 
 ---
 
@@ -15,216 +19,165 @@ Familiares suben pelis a sus nubes (Archive/pCloud/OneDrive)
 Te pasan la URL directa
         │
         ▼
-Helper web (TMDB) → genera bloque JSON
-        │
-        ▼
-Gist (catálogo JSON) ──────────────┐
-                                   │
-         ┌─── GitHub Actions ──────┼─── Build .ipk
-         │                         │
-         ▼                         ▼
-  TV LG → App carga Gist → muestra grilla → reproduce
+Admin CRUD (/admin/) ──► Gist público (catálogo JSON)
+                              │
+                              ▼
+          ┌──────────────────┴──────────────────┐
+          │                                     │
+          ▼                                     ▼
+   Web Player (/)                       TV App (/tv/ → .ipk)
+   (browsers: desktop/mobile)           (LG webOS en TV)
 ```
 
-- **Cero hosting propio** — catálogo en Gist, videos en cuentas de familiares
-- **Cero builds locales** — Actions genera el `.ipk` en cada push
-- **Actualización dinámica** — agregar peli = editar Gist, no hay que reinstalar la app
+- **Cero hosting propio de video** — cada familiar sube a su nube
+- **Cero builds locales** — GitHub Actions genera el `.ipk` en cada push
+- **Un solo catálogo** en un Gist → los dos players consumen lo mismo
+- **Actualización dinámica** — agregar peli = editar Gist, no hay que reinstalar nada
 
 ---
 
-## 📂 Estructura
+## 📂 Estructura del repo
 
 ```
 lg-tv-cinema/
-├── appinfo.json            # Manifest webOS
-├── index.html              # Entry point
-├── icon.png / largeIcon.png / splash.png
-├── css/style.css           # Estilos tipo Netflix (1920x1080)
+├── index.html              ← Player web (/)
+├── css/style.css
 ├── js/
-│   ├── config.js           # CATALOG_URL del Gist
-│   ├── catalog.js          # Fetch + cache en localStorage
-│   ├── navigation.js       # Navegación espacial por mando
-│   ├── ui.js               # Render hero, grilla, detalle
-│   ├── player.js           # Wrapper del <video>
-│   └── app.js              # Orquestador
-├── catalog-example.json    # Ejemplo de catálogo (pegar al Gist)
-├── helper/index.html       # Helper TMDB → JSON (hosteable en GitHub Pages)
-└── .github/workflows/build-ipk.yml
+│   ├── app.js              ← UI, hero, grilla, modal, búsqueda
+│   ├── catalog.js          ← fetch + cache del Gist
+│   └── player.js           ← <video> + HLS.js condicional
+├── tv/                     ← App de TV (webOS)
+│   ├── appinfo.json
+│   ├── index.html
+│   ├── icon.png / largeIcon.png / splash.png
+│   ├── css/style.css
+│   └── js/*.js             ← con navegación espacial por mando
+├── admin/
+│   └── index.html          ← CRUD con autenticación por PAT
+├── .github/workflows/
+│   └── build-ipk.yml       ← empaqueta /tv/ → .ipk
+├── catalog-example.json
+└── README.md
 ```
 
 ---
 
-## 🚀 Setup inicial (una sola vez)
+## 🌐 Player web (`/`)
 
-### 1. Crear el Gist del catálogo
+- Responsive (mobile-first → 4K)
+- Hero rotatorio con pelis destacadas (`featured: true`)
+- Filas horizontales con scroll por categoría
+- "Agregadas recientemente" auto-generada
+- Modal de detalle con sinopsis, director, país, etc.
+- Búsqueda por título, director, año, género, sinopsis
+- Player nativo HTML5 + HLS.js (CDN) para `.m3u8`
+- Fullscreen automático al dar play (desktop)
+- Cache de catálogo 5min + fallback si el Gist está caído
 
-1. Ir a https://gist.github.com
-2. Nombre: `catalog.json`
-3. Pegar el contenido de [`catalog-example.json`](catalog-example.json)
-4. **Create public gist**
-5. Click en **Raw** → copiar la URL (queda tipo `https://gist.githubusercontent.com/USER/HASH/raw/...`)
-
-### 2. Configurar la URL del Gist
-
-Editar [`js/config.js`](js/config.js), reemplazar el valor de `CATALOG_URL`:
-
-```js
-CATALOG_URL: 'https://gist.githubusercontent.com/TU_USUARIO/TU_HASH/raw/catalog.json'
-```
-
-> ⚠️ Usá la URL **sin** el hash del commit específico. La URL "short" (sin hash) siempre devuelve la última versión.
-
-### 3. Push a GitHub → Actions genera el IPK
-
-```bash
-git add . && git commit -m "Config inicial"
-git push
-```
-
-Esperar a que termine el workflow. Ir a **Actions → último run → Artifacts** y descargar el `.ipk`.
-
-### 4. GitHub Pages — Admin CRUD del catálogo
-
-Ya está publicado en: **https://malcofa.github.io/lg-tv-cinema/helper/**
-
-Abrilo desde cualquier navegador (celular/PC). La primera vez pide:
-- **GitHub PAT** (fine-grained con scope `Gists: Read and write`)
-- **Gist ID** (pre-configurado)
-- **TMDB Key** (opcional)
-
-Queda todo en el localStorage del navegador — nunca sale del cliente.
-
-### 5. API Key de TMDB para el helper
-
-- Crear cuenta en https://www.themoviedb.org (gratis)
-- **Settings → API → Request API Key → Developer**
-- Pegarla en el helper (se guarda en localStorage del navegador)
+### Hosting del catálogo
+Ver `js/catalog.js` — apunta al Gist público. Cualquier familiar/amigo puede clonar este repo y apuntar a SU propio Gist para tener su propia instancia.
 
 ---
 
-## 📺 Instalar la app en la TV
+## 📺 App de TV (`/tv/` + `.ipk`)
 
-### Opción A — Developer Mode (para desarrollo y uso personal)
+App webOS vanilla HTML/CSS/JS, optimizada para 1920x1080 + mando a distancia.
 
-1. En la TV: **Content Store → buscar "Developer Mode"** → instalar
-2. Abrir la app **Developer Mode** → login con tu cuenta de LG member → activar **Dev Mode Status: ON**
-3. La TV muestra su **IP** (ej `192.168.1.42`) y un **passphrase** (6 caracteres)
-4. Anotar ambos datos
+### Instalar en TV LG
 
-### Opción B — LG Content Store (publicación oficial)
+1. TV → **Content Store → Developer Mode** → instalar, activar con cuenta LG member
+2. Anotá la **IP** de la TV + passphrase
+3. Descargá el `.ipk` desde **[Actions → último run](https://github.com/malcofa/lg-tv-cinema/actions) → Artifacts**
+4. Abrí `http://<IP-TV>:9991/` desde el navegador de tu PC
+5. Subí el `.ipk` → aparece en la grilla de apps
 
-Proceso aparte, más lento, requiere review de LG. No cubierto en este README.
+**Alternativa USB**: poner el `.ipk` en un pendrive → conectar a la TV → "Install from USB" en Developer Mode.
 
-### Instalar el IPK remotamente (sin cables)
-
-Para **NO instalar `ares-cli` en tu PC**, usá el instalador web oficial:
-
-1. En la TV con Dev Mode: abrir la app **Developer Mode** → ver tu **Device URL** (ej `http://192.168.1.42:9991/`)
-2. Abrir esa URL desde un navegador en tu PC
-3. Subir el `.ipk` que descargaste de Actions
-4. La app aparece en la grilla de apps de la TV
-
-> **Alternativa**: poner el `.ipk` en un pendrive USB → conectar a la TV → usar el botón "Install from USB" en la app Developer Mode.
-
----
-
-## 🎬 Flujo diario: agregar una película
-
-1. Un familiar sube una peli a su Archive/pCloud/OneDrive y te pasa la URL directa
-2. Abrís el Admin: https://malcofa.github.io/lg-tv-cinema/helper/ (bookmarkealo en el cel)
-3. Click **+ Nueva película**
-4. (Opcional) Buscás el título en la caja TMDB de arriba → click en el poster → autocomplete de metadata
-5. Pegás la URL del video, completás categoría/calidad/fuente/quién la agregó
-6. Click **💾 Guardar** → se sincroniza al Gist automáticamente
-7. En la TV, tocás **↻ Refrescar** (o cerrar y reabrir) → aparece la nueva peli
-
-### Editar o eliminar pelis
-
-- Desde el mismo Admin, cada card tiene botones ✏️ (editar) y 🗑️ (eliminar)
-- Todo se sincroniza en vivo al Gist
-
----
-
-## 🔄 Actualizar la app (nueva versión del código)
-
-1. Editás código localmente → `git push`
-2. Actions genera nuevo `.ipk` automáticamente
-3. Lo instalás encima del anterior (la TV sobreescribe)
-
-> **El catálogo NO requiere rebuild** — solo editar el Gist.
-
----
-
-## 🎯 Hosting recomendado por familiar
-
-| Servicio | Free | Streaming directo | Link directo |
-|---|---|---|---|
-| **Internet Archive** | ∞ | ⭐⭐⭐⭐⭐ | `archive.org/download/ID/file.mp4` |
-| **pCloud** | 10 GB | ⭐⭐⭐⭐ | Link público → da URL `.mp4` |
-| **OneDrive** | 5 GB | ⭐⭐⭐ | Link con `?download=1` |
-| **Dropbox** | 2 GB | ⭐⭐ | `?dl=1`, ancho de banda limitado |
-| **Google Drive** | 15 GB | ⭐ | Mejor evitar — quota diaria y warnings |
-
-**Recomendación**: empujar a la familia a usar Internet Archive. Es gratis, ilimitado, diseñado para PDM, y la URL nunca se cae.
-
----
-
-## 🎛️ Controles del mando en la app
+### Controles del mando
 
 | Botón | Acción |
 |---|---|
-| Flechas | Navegar entre cards / botones |
-| OK / Enter | Seleccionar |
-| Back / Volver | Retroceder pantalla |
-| Play / Pause | Play/Pausa en el player |
-| ← / → (en player) | Retroceder / adelantar 10 seg |
+| Flechas | Navegar |
+| OK | Seleccionar |
+| Back | Retroceder pantalla |
+| Play/Pause | Play/Pausa |
+| ←/→ (en player) | Retroceder/adelantar 10s |
 
 ---
 
-## 🧪 Testing
+## 🎛️ Admin CRUD (`/admin/`)
 
-**Sin emulador local** (por regla del proyecto):
+Mini-app web para editar el catálogo sin tocar JSON a mano.
 
-1. **Helper**: se prueba en cualquier navegador — abrir `helper/index.html` directamente
-2. **UI de la app**: `index.html` se puede abrir en Chrome también, pero el foco del mando no funciona (usar flechas del teclado sí anda)
-3. **Reproducción real**: solo en TV (el emulador LG requiere VirtualBox, fuera de scope)
+### Setup inicial (una vez)
 
-Si algún video no reproduce en la TV, es casi siempre por:
-- Codec no soportado (usá MP4 H.264/AAC)
-- URL con redirects (Google Drive, Mega sin API)
-- HTTPS con certificado inválido
-- Archivo muy grande con seek no optimizado
+1. Abrí https://malcofa.github.io/lg-tv-cinema/admin/
+2. **GitHub PAT**: crear en https://github.com/settings/tokens?type=beta → Fine-grained → scope `Gists: Read and write`
+3. **Gist ID**: ya viene pre-cargado (`b74171318151c72fd3be5941e28716d2`)
+4. **TMDB Key** (opcional): https://www.themoviedb.org/settings/api
+
+Todo queda en localStorage — nunca sale del navegador.
+
+### Flujo diario
+
+1. Un familiar te manda un link por WhatsApp
+2. Abrís el admin → **+ Nueva película**
+3. (Opcional) Buscás el título en TMDB → click al poster → metadata auto-completada
+4. Pegás la URL del video, completás categoría/calidad/fuente
+5. **💾 Guardar** → sincroniza al Gist
+6. Los players (web + TV) muestran la nueva peli cuando refresquen
+
+---
+
+## 🎯 Hosting recomendado para videos
+
+| Servicio | Free | Streaming | Notas |
+|---|---|---|---|
+| **Internet Archive** | ∞ | ⭐⭐⭐⭐⭐ | El mejor. Diseñado para PDM, URLs estables, sin quota |
+| **pCloud** | 10 GB | ⭐⭐⭐⭐ | Link público funciona como URL directa |
+| **OneDrive** | 5 GB | ⭐⭐⭐ | Con `?download=1` funciona |
+| **Dropbox** | 2 GB | ⭐⭐ | `?dl=1`, bandwidth limitado |
+| **Google Drive** | 15 GB | ⭐ | Evitar — quota diaria y warnings |
+
+**Recomendación**: empujá a la familia a Internet Archive. Gratis, ilimitado, aporte cultural real.
+
+---
+
+## 🧪 Testing local
+
+- **Player web**: abrir `index.html` en cualquier navegador
+- **Admin**: `admin/index.html` — funciona desde `file://` sin problema
+- **TV app**: solo en TV real (el emulador LG requiere VirtualBox, fuera de scope)
 
 ---
 
 ## 🔧 Troubleshooting
 
 **"No se pudo cargar el catálogo"**
-- URL del Gist mal en `js/config.js`
-- Gist es privado (tiene que ser público)
-- Problema de conexión en la TV
+- Gist privado o URL incorrecta
+- Cache del navegador: Ctrl+Shift+R
 
 **"Error de reproducción"**
-- La URL del video no es directa o redirige
-- Codec no soportado por webOS
-- Probar la URL en un navegador común primero — si no reproduce ahí, tampoco en la TV
+- Codec no soportado (usá MP4 H.264/AAC, nunca MKV/HEVC)
+- URL con redirects (Google Drive, Mega sin API oficial)
+- Probá la URL en un navegador — si no anda ahí, tampoco en la app
 
-**La peli que agregué no aparece**
-- Tocá **↻ Refrescar** en el top bar (bypasea el cache de 5 min)
-- Verificá que el JSON del Gist es válido (usar https://jsonlint.com)
-- Mirá la consola del `ares-inspect` en la TV (si es dev)
+**La peli agregada no aparece en el player**
+- Tocá **↻ Refrescar** en el header
+- Esperá ~5 min (cache del cliente) o limpiá localStorage
 
 ---
 
 ## 📦 Requisitos
 
 - **TV**: LG webOS 3.0+ (modelos 2016+)
-- **Cuenta LG member** (free) para habilitar Dev Mode
+- **Cuenta LG member** (free) para Dev Mode
 - **Cuenta GitHub** (free) para repo + Actions + Gist + Pages
-- **Cuenta TMDB** (free) para el helper
+- **Cuenta TMDB** (free, opcional) para autocompletar metadata
 
 ---
 
-## 📜 Licencia
+## 📜 Licencia y contenido
 
-Código MIT. Contenido servido por la app: responsabilidad de quien lo sube.
+- Código: MIT
+- Contenido: cada película debe ser de dominio público. Ejemplos legítimos: Battleship Potemkin (1925), Broken Blossoms (1919), Convict 13 (1920), Nosferatu (1922), Nomads of the North (1920), Flesh and Blood (1922), Girl Shy (1924).

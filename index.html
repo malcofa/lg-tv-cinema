@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="description" content="Cine clásico gratis — películas de dominio público en streaming. Acorazado Potemkin, Buster Keaton, D.W. Griffith y más.">
+<title>Cinema Clásico — Películas de dominio público</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e50914'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3E🎬%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ================= HEADER ================= -->
+<header class="site-header" id="site-header">
+  <div class="header-inner">
+    <a href="#" class="brand" onclick="App.scrollTop(event)">
+      <span class="brand-icon">🎬</span>
+      <span class="brand-text">CINEMA <b>CLÁSICO</b></span>
+    </a>
+    <div class="header-actions">
+      <button class="icon-btn" id="search-toggle" title="Buscar" aria-label="Buscar">🔎</button>
+      <button class="icon-btn" id="refresh-btn" title="Actualizar" aria-label="Actualizar">↻</button>
+    </div>
+  </div>
+  <div class="search-bar" id="search-bar">
+    <input type="search" id="search-input" placeholder="Buscar por título, director, año..." autocomplete="off">
+    <button class="icon-btn" id="search-close">✕</button>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<section class="hero" id="hero" aria-label="Película destacada">
+  <div class="hero-bg" id="hero-bg"></div>
+  <div class="hero-gradient"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow" id="hero-eyebrow">DESTACADA</p>
+    <h1 class="hero-title" id="hero-title"></h1>
+    <div class="hero-meta" id="hero-meta"></div>
+    <p class="hero-synopsis" id="hero-synopsis"></p>
+    <div class="hero-actions">
+      <button class="btn btn-primary" id="hero-play">
+        <span class="btn-icon">▶</span> Reproducir
+      </button>
+      <button class="btn btn-secondary" id="hero-info">
+        <span class="btn-icon">ⓘ</span> Más información
+      </button>
+    </div>
+  </div>
+  <div class="hero-dots" id="hero-dots"></div>
+</section>
+
+<!-- ================= LOADING ================= -->
+<div class="loading-state" id="loading-state">
+  <div class="spinner"></div>
+  <p>Cargando catálogo…</p>
+</div>
+
+<!-- ================= ERROR ================= -->
+<div class="error-state hidden" id="error-state">
+  <h2>😕 No pudimos cargar el catálogo</h2>
+  <p id="error-message"></p>
+  <button class="btn btn-primary" onclick="App.load()">Reintentar</button>
+</div>
+
+<!-- ================= CATEGORIES ================= -->
+<main class="categories" id="categories"></main>
+
+<!-- ================= SEARCH RESULTS ================= -->
+<section class="search-results hidden" id="search-results">
+  <h2 class="section-title">Resultados de búsqueda</h2>
+  <div class="grid" id="search-grid"></div>
+  <p class="empty-search hidden" id="empty-search">No encontramos nada con esa búsqueda.</p>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+  <p>
+    🎬 <b>Cinema Clásico</b> — Todas las películas son de dominio público (Public Domain Movies).
+  </p>
+  <p class="footer-links">
+    <a href="https://github.com/malcofa/lg-tv-cinema" target="_blank">GitHub</a>
+    · <a href="tv/" target="_blank">Versión TV</a>
+    · <a href="admin/" target="_blank">Admin</a>
+  </p>
+</footer>
+
+<!-- ================= DETAIL MODAL ================= -->
+<div class="modal-backdrop hidden" id="detail-modal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <button class="modal-close" id="detail-close" aria-label="Cerrar">✕</button>
+    <div class="modal-bg" id="modal-bg"></div>
+    <div class="modal-gradient"></div>
+    <div class="modal-content">
+      <h2 class="modal-title" id="modal-title"></h2>
+      <div class="modal-meta" id="modal-meta"></div>
+      <p class="modal-tagline" id="modal-tagline"></p>
+      <p class="modal-synopsis" id="modal-synopsis"></p>
+      <div class="modal-info" id="modal-info"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="modal-play">
+          <span class="btn-icon">▶</span> Reproducir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PLAYER ================= -->
+<div class="player-overlay hidden" id="player-overlay">
+  <button class="player-close" id="player-close" aria-label="Cerrar">✕</button>
+  <div class="player-container">
+    <video id="player-video" controls playsinline></video>
+    <div class="player-title-bar">
+      <h3 id="player-title"></h3>
+    </div>
+  </div>
+</div>
+
+<!-- ================= TOAST ================= -->
+<div class="toast" id="toast"></div>
+
+<script src="js/catalog.js"></script>
+<script src="js/player.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
