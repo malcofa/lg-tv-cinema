@@ -76,8 +76,121 @@
   }
   .count { color: var(--muted); font-size: 13px; }
 
-  /* Movie list */
+  /* View toggle */
+  .view-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .view-toggle .view-btn {
+    width: 36px; height: 36px;
+    background: var(--card);
+    color: var(--muted);
+    font-size: 16px;
+    border: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .view-toggle .view-btn:hover { background: #24242e; color: var(--text); }
+  .view-toggle .view-btn.active { background: var(--accent); color: #fff; }
+
+  /* Movie list — GRID (default) */
   .movie-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+  /* Movie list — LIST view */
+  .movie-list.list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .movie-list.list-view .movie-card {
+    flex-direction: row;
+    height: 130px;
+  }
+  .movie-list.list-view .movie-poster {
+    flex: 0 0 87px;
+    aspect-ratio: 2/3;
+    height: 100%;
+  }
+  .movie-list.list-view .movie-poster.empty { font-size: 30px; }
+  .movie-list.list-view .movie-featured {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+  .movie-list.list-view .card-select {
+    top: 6px; right: 6px;
+  }
+  .movie-list.list-view .movie-body {
+    flex: 1;
+    padding: 10px 14px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .movie-list.list-view .movie-title {
+    font-size: 16px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .movie-list.list-view .movie-sub {
+    font-size: 12px;
+    margin-bottom: 4px;
+    min-height: 0;
+  }
+  .movie-list.list-view .movie-tags {
+    margin-bottom: 4px;
+    max-height: 20px;
+    overflow: hidden;
+  }
+  .movie-list.list-view .card-enrich,
+  .movie-list.list-view .movie-actions {
+    margin-top: auto;
+  }
+  .movie-list.list-view .movie-actions {
+    justify-content: flex-end;
+  }
+  @media (max-width: 600px) {
+    .movie-list.list-view .movie-card { height: auto; }
+    .movie-list.list-view .movie-poster { flex: 0 0 70px; }
+  }
+
+  /* Card enrich input — pegá TMDB/IMDB ID/URL y guarda al salir del input */
+  .card-enrich {
+    margin-bottom: 6px;
+    position: relative;
+  }
+  .card-enrich input {
+    width: 100%;
+    background: #0a0a0f;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 5px 26px 5px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    outline: none;
+    font-family: inherit;
+  }
+  .card-enrich input:focus { border-color: var(--accent); }
+  .card-enrich input:disabled { opacity: 0.7; cursor: wait; }
+  .card-enrich input::placeholder { color: #555; font-size: 11px; }
+  .card-enrich .status {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    pointer-events: none;
+  }
+  .card-enrich .status.loading::before {
+    content: '';
+    display: inline-block;
+    width: 10px; height: 10px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .card-enrich .status.ok::before { content: '✓'; color: var(--success); }
+  .card-enrich .status.err::before { content: '✕'; color: var(--danger); }
   .movie-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 8px;
     overflow: hidden; display: flex; flex-direction: column;
@@ -383,6 +496,10 @@
         <option value="yes">Solo destacadas</option>
         <option value="no">Solo no destacadas</option>
       </select>
+      <div class="view-toggle" role="tablist" aria-label="Modo de vista">
+        <button class="view-btn" data-view="grid" title="Cuadrícula" aria-label="Cuadrícula">⊞</button>
+        <button class="view-btn" data-view="list" title="Listado" aria-label="Listado">☰</button>
+      </div>
       <span class="count" id="count">0 películas</span>
     </div>
 
@@ -1348,6 +1465,94 @@ const BulkImport = (() => {
    CONFIRM MODAL
 ================================================================= */
 /* =================================================================
+   ENRICH — agregar metadata a una peli existente desde TMDB/IMDB
+================================================================= */
+const Enrich = (() => {
+  /**
+   * Detecta el tipo de referencia externa.
+   * Devuelve { provider: 'tmdb'|'omdb', id: '...' } o lanza error.
+   */
+  function parseRef(input) {
+    const s = String(input || '').trim();
+    if (!s) throw new Error('Vacío');
+    // URL de TMDB
+    let m = s.match(/themoviedb\.org\/movie\/(\d+)/i);
+    if (m) return { provider: 'tmdb', id: m[1] };
+    // URL de IMDb
+    m = s.match(/imdb\.com\/title\/(tt\d+)/i);
+    if (m) return { provider: 'omdb', id: m[1] };
+    // IMDb ID suelto
+    if (/^tt\d+$/i.test(s)) return { provider: 'omdb', id: s };
+    // Número suelto → TMDB
+    if (/^\d+$/.test(s)) return { provider: 'tmdb', id: s };
+    throw new Error('Formato no reconocido. Usá URL de TMDB/IMDB o el ID.');
+  }
+
+  async function fetchTMDB(id) {
+    const s = Settings.get();
+    if (!s.tmdb) throw new Error('TMDB key no configurada');
+    const lang = 'es-ES';
+    const r = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${encodeURIComponent(s.tmdb)}&language=${lang}&append_to_response=credits,videos`);
+    if (!r.ok) throw new Error('TMDB HTTP ' + r.status);
+    const m = await r.json();
+    const director = (m.credits && m.credits.crew || []).find(c => c.job === 'Director');
+    const trailer = (m.videos && m.videos.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube');
+    const out = {};
+    if (m.title) out.title = m.title;
+    if (m.original_title && m.original_title !== m.title) out.original_title = m.original_title;
+    const year = parseInt((m.release_date || '').slice(0,4), 10);
+    if (year) out.year = year;
+    if (m.runtime) out.duration_min = m.runtime;
+    if (director) out.director = director.name;
+    const country = (m.production_countries || []).map(c => c.name).join(', ');
+    if (country) out.country = country;
+    if (m.vote_average) out.rating = Math.round(m.vote_average * 10) / 10;
+    if (m.overview) out.synopsis = m.overview;
+    if (m.tagline) out.tagline = m.tagline;
+    if (m.poster_path) out.poster_url = `https://image.tmdb.org/t/p/w500${m.poster_path}`;
+    if (m.backdrop_path) out.backdrop_url = `https://image.tmdb.org/t/p/original${m.backdrop_path}`;
+    if (m.genres && m.genres.length) out.genres = m.genres.map(g => g.name);
+    if (trailer) out.trailer_url = `https://www.youtube.com/watch?v=${trailer.key}`;
+    return out;
+  }
+
+  async function fetchOMDb(imdbId) {
+    const s = Settings.get();
+    if (!s.omdb) throw new Error('OMDb key no configurada');
+    const r = await fetch(`https://www.omdbapi.com/?apikey=${encodeURIComponent(s.omdb)}&i=${encodeURIComponent(imdbId)}&plot=full`);
+    if (!r.ok) throw new Error('OMDb HTTP ' + r.status);
+    const m = await r.json();
+    if (m.Response === 'False') throw new Error(m.Error || 'No encontrado');
+    const ok = v => v != null && v !== '' && v !== 'N/A';
+    const out = {};
+    if (ok(m.Title)) out.title = m.Title;
+    if (ok(m.Year)) out.year = parseInt(m.Year, 10) || m.Year;
+    const runtime = parseInt((m.Runtime || '').replace(/[^\d]/g, ''), 10);
+    if (runtime) out.duration_min = runtime;
+    if (ok(m.Director)) out.director = m.Director;
+    if (ok(m.Country)) out.country = m.Country;
+    if (ok(m.Language)) out.language = m.Language;
+    if (ok(m.Plot)) out.synopsis = m.Plot;
+    if (ok(m.imdbRating)) out.rating = parseFloat(m.imdbRating);
+    if (ok(m.Poster)) out.poster_url = m.Poster;
+    if (ok(m.Genre)) out.genres = m.Genre.split(',').map(g => g.trim()).filter(Boolean);
+    return out;
+  }
+
+  /** Aplica metadata a una peli existente. Preserva campos custom. */
+  async function applyToMovie(movieId, refInput) {
+    const ref = parseRef(refInput);
+    const data = ref.provider === 'tmdb'
+      ? await fetchTMDB(ref.id)
+      : await fetchOMDb(ref.id);
+    if (Object.keys(data).length === 0) throw new Error('Sin datos');
+    return await App.enrichMovie(movieId, data);
+  }
+
+  return { applyToMovie, parseRef, fetchTMDB, fetchOMDb };
+})();
+
+/* =================================================================
    SELECTION — multi-select + bulk delete con confirmación
 ================================================================= */
 const Selection = (() => {
@@ -1558,6 +1763,28 @@ const App = (() => {
     return { removed };
   }
 
+  /**
+   * Mergea metadata en una peli existente.
+   * Preserva los campos "custom" del usuario: id, video_url, category,
+   * featured, added_by, added_at.
+   */
+  async function enrichMovie(movieId, data) {
+    const idx = catalog.movies.findIndex(m => m.id === movieId);
+    if (idx < 0) throw new Error('No existe esa peli');
+    const PROTECTED = ['id', 'video_url', 'category', 'featured', 'added_by', 'added_at', 'source'];
+    const original = catalog.movies[idx];
+    const merged = Object.assign({}, original, data);
+    // Restaurar los protegidos
+    PROTECTED.forEach(k => {
+      if (original[k] !== undefined) merged[k] = original[k];
+      else delete merged[k];
+    });
+    catalog.movies[idx] = merged;
+    await save();
+    render();
+    return merged;
+  }
+
   function render() {
     // Depura IDs de Selection que ya no existan (tras reload/edit/delete)
     if (window.Selection) Selection.purgeStale();
@@ -1633,6 +1860,10 @@ const App = (() => {
         <div class="movie-title">${esc(m.title)}</div>
         <div class="movie-sub">${esc(sub)}</div>
         <div class="movie-tags">${tags.join('')}</div>
+        <div class="card-enrich">
+          <input class="enrich-input" placeholder="✨ TMDB/IMDB ID o URL — se guarda al salir">
+          <span class="status"></span>
+        </div>
         <div class="movie-actions">
           <button class="btn secondary" data-act="edit">✏️ Editar</button>
           <button class="btn danger" data-act="delete">🗑️</button>
@@ -1643,6 +1874,30 @@ const App = (() => {
     const cb = d.querySelector('input[type="checkbox"]');
     cb.addEventListener('click', e => e.stopPropagation());
     cb.addEventListener('change', () => Selection.toggle(m.id));
+
+    const enrichIn = d.querySelector('.enrich-input');
+    const statusEl = d.querySelector('.card-enrich .status');
+    enrichIn.addEventListener('blur', async () => {
+      const val = enrichIn.value.trim();
+      if (!val) return;
+      statusEl.className = 'status loading';
+      enrichIn.disabled = true;
+      try {
+        await Enrich.applyToMovie(m.id, val);
+        statusEl.className = 'status ok';
+        Toast.ok('Metadata agregada a: ' + m.title);
+      } catch (err) {
+        statusEl.className = 'status err';
+        statusEl.title = err.message;
+        Toast.err('Error: ' + err.message);
+        enrichIn.disabled = false;
+      }
+    });
+    enrichIn.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); enrichIn.blur(); }
+      if (e.key === 'Escape') { enrichIn.value = ''; enrichIn.blur(); }
+    });
+    enrichIn.addEventListener('click', e => e.stopPropagation());
     return d;
   }
 
@@ -1675,7 +1930,7 @@ const App = (() => {
 
   function getMovies() { return (catalog && catalog.movies) ? catalog.movies.slice() : []; }
 
-  return { init, reload, upsertMovie, deleteMovie, bulkInsert, bulkDelete, getCategories, getMovies };
+  return { init, reload, upsertMovie, deleteMovie, bulkInsert, bulkDelete, enrichMovie, getCategories, getMovies };
 })();
 
 /* =================================================================
@@ -1705,9 +1960,42 @@ function slug(s) {
 }
 
 /* =================================================================
+   VIEW TOGGLE — cuadrícula vs listado (preferencia persistida)
+================================================================= */
+const View = (() => {
+  const KEY = 'cinema_admin_view_v1';
+  let mode = localStorage.getItem(KEY) || 'grid';
+
+  function apply() {
+    const list = document.getElementById('movie-list');
+    list.classList.toggle('list-view', mode === 'list');
+    document.querySelectorAll('.view-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === mode);
+    });
+  }
+
+  function set(newMode) {
+    if (newMode !== 'grid' && newMode !== 'list') return;
+    mode = newMode;
+    localStorage.setItem(KEY, mode);
+    apply();
+  }
+
+  function init() {
+    document.querySelectorAll('.view-btn').forEach(b => {
+      b.addEventListener('click', () => set(b.dataset.view));
+    });
+    apply();
+  }
+
+  return { init, set, get: () => mode };
+})();
+
+/* =================================================================
    BOOT
 ================================================================= */
 TagsInput.init();
+View.init();
 App.init();
 </script>
 </body>
