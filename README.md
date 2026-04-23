@@ -83,11 +83,16 @@ git push
 
 Esperar a que termine el workflow. Ir a **Actions → último run → Artifacts** y descargar el `.ipk`.
 
-### 4. Habilitar GitHub Pages para el helper (opcional pero recomendado)
+### 4. GitHub Pages — Admin CRUD del catálogo
 
-En el repo → **Settings → Pages** → Source: `main` branch, folder `/helper` (o `/docs` si preferís mover el folder).
+Ya está publicado en: **https://malcofa.github.io/lg-tv-cinema/helper/**
 
-Quedará disponible en `https://TU_USUARIO.github.io/lg-tv-cinema/` y podés usarlo desde cualquier navegador.
+Abrilo desde cualquier navegador (celular/PC). La primera vez pide:
+- **GitHub PAT** (fine-grained con scope `Gists: Read and write`)
+- **Gist ID** (pre-configurado)
+- **TMDB Key** (opcional)
+
+Queda todo en el localStorage del navegador — nunca sale del cliente.
 
 ### 5. API Key de TMDB para el helper
 
@@ -126,13 +131,17 @@ Para **NO instalar `ares-cli` en tu PC**, usá el instalador web oficial:
 ## 🎬 Flujo diario: agregar una película
 
 1. Un familiar sube una peli a su Archive/pCloud/OneDrive y te pasa la URL directa
-2. Abrís el helper (GitHub Pages o `helper/index.html` local en navegador)
-3. Pegás la API key TMDB (una vez)
-4. Buscás la peli → click en el poster → autocomplete de metadata
-5. Pegás la URL del video, completás categoría/calidad/fuente
-6. Click **Copiar** → el bloque JSON va al portapapeles
-7. Abrís tu Gist → **Edit** → pegás dentro del array `movies` → **Update gist**
-8. En la TV, tocás **↻ Refrescar** (o cerrar y reabrir) → aparece la nueva peli
+2. Abrís el Admin: https://malcofa.github.io/lg-tv-cinema/helper/ (bookmarkealo en el cel)
+3. Click **+ Nueva película**
+4. (Opcional) Buscás el título en la caja TMDB de arriba → click en el poster → autocomplete de metadata
+5. Pegás la URL del video, completás categoría/calidad/fuente/quién la agregó
+6. Click **💾 Guardar** → se sincroniza al Gist automáticamente
+7. En la TV, tocás **↻ Refrescar** (o cerrar y reabrir) → aparece la nueva peli
+
+### Editar o eliminar pelis
+
+- Desde el mismo Admin, cada card tiene botones ✏️ (editar) y 🗑️ (eliminar)
+- Todo se sincroniza en vivo al Gist
 
 ---
 
