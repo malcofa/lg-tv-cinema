@@ -167,7 +167,13 @@
     } else {
       card.textContent = '🎬';
     }
-    if (m.featured) {
+
+    const adminOn = !!(global.AdminMode && global.AdminMode.isEnabled());
+    if (adminOn) {
+      // Estrella interactiva (solo visible al admin)
+      card.appendChild(buildStarButton(m));
+    } else if (m.featured) {
+      // Badge no-interactivo para visitantes comunes
       const b = document.createElement('div');
       b.className = 'card-badge';
       b.textContent = '★';
@@ -275,6 +281,48 @@
     btn.innerHTML = featured
       ? '<span class="btn-icon">★</span> Quitar destacada'
       : '<span class="btn-icon">☆</span> Destacar';
+  }
+
+  /**
+   * Botón de estrella en cada card (solo para admin).
+   * - Destacada: estrella ★ amarilla completa sobre fondo amarillo
+   * - No destacada: estrella ☆ vacía con borde amarillo sobre fondo oscuro
+   */
+  function buildStarButton(m) {
+    const star = document.createElement('button');
+    star.className = 'card-star';
+    star.type = 'button';
+    syncStar(star, !!m.featured);
+    star.addEventListener('click', async (e) => {
+      e.stopPropagation(); // no abrir el detail al tocar la estrella
+      e.preventDefault();
+      if (star.classList.contains('saving')) return;
+      const wasFeatured = !!m.featured;
+      const newValue = !wasFeatured;
+      star.classList.add('saving');
+      syncStar(star, newValue); // optimista
+      try {
+        await global.AdminMode.toggleFeatured(m.id, newValue);
+        if (newValue) m.featured = true;
+        else delete m.featured;
+        renderHero(); // actualizar hero (cambió la lista de featured)
+        toast(newValue ? '⭐ Destacada' : 'Destacada removida', 2000);
+      } catch (err) {
+        // rollback visual + estado
+        syncStar(star, wasFeatured);
+        toast('Error: ' + err.message, 4000);
+      } finally {
+        star.classList.remove('saving');
+      }
+    });
+    return star;
+  }
+
+  function syncStar(star, featured) {
+    star.dataset.featured = featured ? '1' : '0';
+    star.textContent = featured ? '★' : '☆';
+    star.title = featured ? 'Quitar destacada' : 'Destacar';
+    star.setAttribute('aria-label', star.title);
   }
   function closeDetail() {
     $('detail-modal').classList.add('hidden');

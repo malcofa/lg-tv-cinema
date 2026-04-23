@@ -371,6 +371,45 @@ img { display: block; max-width: 100%; }
   font-weight: 800;
   letter-spacing: 1px;
 }
+
+/* Admin-only: botón interactivo para destacar/des-destacar desde la card */
+.card-star {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #fbbf24;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fbbf24;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+  padding: 0;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  font-family: inherit;
+}
+.card-star:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+}
+.card-star[data-featured="1"] {
+  background: #fbbf24;
+  color: #111;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.45);
+}
+.card-star.saving {
+  opacity: 0.55;
+  cursor: wait;
+  pointer-events: none;
+}
 .card-overlay {
   position: absolute;
   bottom: 0; left: 0; right: 0;
