@@ -27,6 +27,24 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const cssUrl = s => String(s == null ? '' : s).replace(/[\\"]/g, '\\$&');
+
+  /**
+   * Algunas CDNs (Wikipedia, TMDB) bloquean o fallan en el navegador de la TV
+   * LG 2019 (Chrome 79). Las routeamos por images.weserv.nl que es un
+   * proxy gratuito que re-sirve cualquier imagen con headers compatibles.
+   * Si la URL es de Internet Archive (que sí funciona nativo), pasa directo.
+   */
+  function proxyImage(url) {
+    if (!url) return '';
+    const s = String(url);
+    // Archive.org anda bien nativo, no proxear
+    if (/archive\.org/i.test(s)) return s;
+    // Data URIs o relativas: no tocar
+    if (/^(data:|\/)/.test(s)) return s;
+    // Sacar protocolo para formato weserv.nl
+    const clean = s.replace(/^https?:\/\//, '');
+    return 'https://images.weserv.nl/?url=' + encodeURIComponent(clean);
+  }
   function toast(msg, ms) {
     const t = $('toast');
     t.textContent = msg;
@@ -362,7 +380,7 @@
   function paintHero() {
     const m = state.heroList[state.heroIdx];
     if (!m) return;
-    const bg = m.backdrop_url || m.poster_url || '';
+    const bg = proxyImage(m.backdrop_url || m.poster_url || '');
     $('hero-bg').style.backgroundImage = bg ? `url("${cssUrl(bg)}")` : '';
     $('hero-title').textContent = m.title || '';
     $('hero-meta').innerHTML = formatMeta(m);
@@ -430,7 +448,7 @@
     card.className = 'card' + (m.poster_url ? '' : ' empty');
     card.tabIndex = 0;
     if (m.poster_url) {
-      card.style.backgroundImage = `url("${cssUrl(m.poster_url)}")`;
+      card.style.backgroundImage = `url("${cssUrl(proxyImage(m.poster_url))}")`;
     } else {
       card.textContent = '🎬';
     }
@@ -496,7 +514,7 @@
   ========================================================= */
   function openDetail(m) {
     state.currentMovie = m;
-    $('modal-bg').style.backgroundImage = `url("${cssUrl(m.backdrop_url || m.poster_url || '')}")`;
+    $('modal-bg').style.backgroundImage = `url("${cssUrl(proxyImage(m.backdrop_url || m.poster_url || ''))}")`;
     $('modal-title').textContent = m.title || '';
     $('modal-meta').innerHTML = formatMeta(m);
     $('modal-tagline').textContent = m.tagline || '';
