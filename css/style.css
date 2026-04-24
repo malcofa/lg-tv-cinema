@@ -752,6 +752,15 @@ img { display: block; max-width: 100%; }
 }
 
 /* ============================================
+   TV browser auto-zoom + touch target aumentado
+   Se activa cuando JS detecta user-agent de TV.
+   ============================================ */
+html.is-tv { zoom: 1.25; }
+html.is-tv body { -webkit-user-select: none; user-select: none; }
+html.is-tv .icon-btn { width: 48px; height: 48px; font-size: 22px; }
+html.is-tv .btn { padding: 14px 30px; }
+
+/* ============================================
    Remote navigation focus (TV sin cursor)
    Solo visible cuando body.remote-mode está activo.
    ============================================ */

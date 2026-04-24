@@ -19,6 +19,9 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // Escape específico para poner URLs dentro de url("...") en CSS —
+  // solo escapa " y \ que sí rompen el string CSS; el HTML esc rompía URLs.
+  const cssUrl = s => String(s == null ? '' : s).replace(/[\\"]/g, '\\$&');
 
   /* ================= TOAST ================= */
   function toast(msg, ms) {
@@ -76,7 +79,7 @@
     const m = state.heroList[state.heroIdx];
     if (!m) return;
     const bg = m.backdrop_url || m.poster_url || '';
-    $('hero-bg').style.backgroundImage = bg ? `url('${esc(bg)}')` : '';
+    $('hero-bg').style.backgroundImage = bg ? `url("${cssUrl(bg)}")` : '';
     $('hero-eyebrow').textContent = m.tagline ? 'DESTACADA' : 'DESTACADA';
     $('hero-title').textContent = m.title || '';
     $('hero-meta').innerHTML = formatMeta(m);
@@ -166,7 +169,7 @@
     const card = document.createElement('div');
     card.className = 'card' + (m.poster_url ? '' : ' empty');
     if (m.poster_url) {
-      card.style.backgroundImage = `url('${esc(m.poster_url)}')`;
+      card.style.backgroundImage = `url("${cssUrl(m.poster_url)}")`;
     } else {
       card.textContent = '🎬';
     }
@@ -191,7 +194,7 @@
     card.appendChild(ov);
     card.addEventListener('click', () => openDetail(m));
     card.setAttribute('role', 'button');
-    card.setAttribute('tabindex', '0');
+    card.tabIndex = 0;
     card.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(m); }
     });
@@ -211,7 +214,7 @@
   /* ================= DETAIL MODAL ================= */
   function openDetail(m) {
     state.currentMovie = m;
-    $('modal-bg').style.backgroundImage = `url('${esc(m.backdrop_url || m.poster_url || '')}')`;
+    $('modal-bg').style.backgroundImage = `url("${cssUrl(m.backdrop_url || m.poster_url || '')}")`;
     $('modal-title').textContent = m.title || '';
     $('modal-meta').innerHTML = formatMeta(m);
     $('modal-tagline').textContent = m.tagline || '';

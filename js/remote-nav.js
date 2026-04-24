@@ -13,6 +13,16 @@
   const FOCUSED = 'tv-focused';
   const BODY_REMOTE = 'remote-mode';
 
+  // Auto-detecta TVs y agrega clase para aplicar zoom/tamaño adecuado
+  const UA = (navigator.userAgent || '').toLowerCase();
+  const isTVBrowser = /webos|smarttv|tizen|netcast|googletv|viera|web0s|bravia|hbbtv/.test(UA);
+  if (isTVBrowser) {
+    document.documentElement.classList.add('is-tv');
+    // Intenta marcar el body también cuando ya existe
+    if (document.body) document.body.classList.add('is-tv');
+    else document.addEventListener('DOMContentLoaded', () => document.body.classList.add('is-tv'));
+  }
+
   let current = null;
   let mode = 'home'; // home | modal | player
   let active = false;
@@ -62,7 +72,22 @@
     clearFocus();
     current = el;
     el.classList.add(FOCUSED);
+    // Foco nativo: necesario para que Enter dispare el click en TVs viejas
+    try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) {} }
     scrollToEl(el);
+  }
+
+  function safeScrollBy(target, dx, dy) {
+    // Intenta smooth; si el browser no lo soporta, scroll directo (sin animación)
+    try {
+      target.scrollBy({ left: dx || 0, top: dy || 0, behavior: 'smooth' });
+    } catch (e) {
+      try { target.scrollBy(dx || 0, dy || 0); }
+      catch (e2) {
+        if ('scrollLeft' in target) target.scrollLeft += (dx || 0);
+        if ('scrollTop' in target) target.scrollTop += (dy || 0);
+      }
+    }
   }
 
   function scrollToEl(el) {
@@ -73,9 +98,9 @@
       const rr = row.getBoundingClientRect();
       const pad = 60;
       if (r.right > rr.right - pad) {
-        row.scrollBy({ left: r.right - rr.right + pad + 40, behavior: 'smooth' });
+        safeScrollBy(row, r.right - rr.right + pad + 40, 0);
       } else if (r.left < rr.left + pad) {
-        row.scrollBy({ left: r.left - rr.left - pad - 40, behavior: 'smooth' });
+        safeScrollBy(row, r.left - rr.left - pad - 40, 0);
       }
     }
     // Scroll vertical del documento
@@ -83,9 +108,9 @@
     const h = window.innerHeight;
     const topPad = 120, botPad = 60;
     if (r.top < topPad) {
-      window.scrollBy({ top: r.top - topPad, behavior: 'smooth' });
+      safeScrollBy(window, 0, r.top - topPad);
     } else if (r.bottom > h - botPad) {
-      window.scrollBy({ top: r.bottom - (h - botPad), behavior: 'smooth' });
+      safeScrollBy(window, 0, r.bottom - (h - botPad));
     }
   }
 
