@@ -29,21 +29,39 @@
   const cssUrl = s => String(s == null ? '' : s).replace(/[\\"]/g, '\\$&');
 
   /**
-   * Algunas CDNs (Wikipedia, TMDB) bloquean o fallan en el navegador de la TV
-   * LG 2019 (Chrome 79). Las routeamos por images.weserv.nl que es un
-   * proxy gratuito que re-sirve cualquier imagen con headers compatibles.
-   * Si la URL es de Internet Archive (que sí funciona nativo), pasa directo.
+   * Proxy para URLs que el navegador de la TV LG 2019 (Chrome 79) no puede
+   * cargar directo (ej. Wikipedia Commons, TMDB). Usamos images.weserv.nl
+   * como fallback. Archive.org pasa directo porque sí funciona nativo.
    */
   function proxyImage(url) {
     if (!url) return '';
     const s = String(url);
-    // Archive.org anda bien nativo, no proxear
     if (/archive\.org/i.test(s)) return s;
-    // Data URIs o relativas: no tocar
     if (/^(data:|\/)/.test(s)) return s;
-    // Sacar protocolo para formato weserv.nl
     const clean = s.replace(/^https?:\/\//, '');
     return 'https://images.weserv.nl/?url=' + encodeURIComponent(clean);
+  }
+
+  /**
+   * Intenta cargar url directo; si falla, llama al callback con la URL
+   * proxeada para retry. Así no rompemos cards cuya carga directa sí funciona.
+   */
+  function preloadWithFallback(url, onFallback) {
+    if (!url) return;
+    // No intentar fallback si ya es un proxy o un archive directo
+    if (/weserv\.nl|archive\.org/i.test(url)) return;
+    const img = new Image();
+    img.onerror = () => {
+      const proxied = proxyImage(url);
+      if (proxied && proxied !== url) {
+        // Verificamos que el proxy cargue antes de aplicar
+        const test = new Image();
+        test.onload = () => onFallback(proxied);
+        test.onerror = () => onFallback(null);
+        test.src = proxied;
+      }
+    };
+    img.src = url;
   }
   function toast(msg, ms) {
     const t = $('toast');
@@ -380,8 +398,14 @@
   function paintHero() {
     const m = state.heroList[state.heroIdx];
     if (!m) return;
-    const bg = proxyImage(m.backdrop_url || m.poster_url || '');
-    $('hero-bg').style.backgroundImage = bg ? `url("${cssUrl(bg)}")` : '';
+    const bgOrig = m.backdrop_url || m.poster_url || '';
+    $('hero-bg').style.backgroundImage = bgOrig ? `url("${cssUrl(bgOrig)}")` : '';
+    // Si el backdrop directo falla, reintentar vía proxy weserv.nl
+    preloadWithFallback(bgOrig, proxied => {
+      if (proxied && state.heroList[state.heroIdx] && state.heroList[state.heroIdx].id === m.id) {
+        $('hero-bg').style.backgroundImage = `url("${cssUrl(proxied)}")`;
+      }
+    });
     $('hero-title').textContent = m.title || '';
     $('hero-meta').innerHTML = formatMeta(m);
     $('hero-synopsis').textContent = m.synopsis || '';
@@ -448,7 +472,11 @@
     card.className = 'card' + (m.poster_url ? '' : ' empty');
     card.tabIndex = 0;
     if (m.poster_url) {
-      card.style.backgroundImage = `url("${cssUrl(proxyImage(m.poster_url))}")`;
+      // Directo primero. Si falla, el onerror del Image() loader proxeará.
+      card.style.backgroundImage = `url("${cssUrl(m.poster_url)}")`;
+      preloadWithFallback(m.poster_url, proxied => {
+        if (proxied) card.style.backgroundImage = `url("${cssUrl(proxied)}")`;
+      });
     } else {
       card.textContent = '🎬';
     }
@@ -514,7 +542,13 @@
   ========================================================= */
   function openDetail(m) {
     state.currentMovie = m;
-    $('modal-bg').style.backgroundImage = `url("${cssUrl(proxyImage(m.backdrop_url || m.poster_url || ''))}")`;
+    const mbgOrig = m.backdrop_url || m.poster_url || '';
+    $('modal-bg').style.backgroundImage = `url("${cssUrl(mbgOrig)}")`;
+    preloadWithFallback(mbgOrig, proxied => {
+      if (proxied && state.currentMovie === m) {
+        $('modal-bg').style.backgroundImage = `url("${cssUrl(proxied)}")`;
+      }
+    });
     $('modal-title').textContent = m.title || '';
     $('modal-meta').innerHTML = formatMeta(m);
     $('modal-tagline').textContent = m.tagline || '';
