@@ -144,7 +144,13 @@
 
   function click() {
     if (!current) return;
-    current.click();
+    // Aseguramos foco nativo antes del click, por si el TV browser lo requiere
+    try { current.focus({ preventScroll: true }); } catch (e) {}
+    try { current.click(); } catch (e) {}
+    // Fallback: disparar MouseEvent explícito
+    try {
+      current.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    } catch (e) {}
   }
 
   function goBack() {
@@ -168,52 +174,68 @@
     return t === 'INPUT' || t === 'TEXTAREA';
   }
 
-  function onKeyDown(e) {
+  function keyDirection(e) {
     const k = e.keyCode;
+    const key = e.key;
+    if (k === 37 || key === 'ArrowLeft') return 'left';
+    if (k === 38 || key === 'ArrowUp') return 'up';
+    if (k === 39 || key === 'ArrowRight') return 'right';
+    if (k === 40 || key === 'ArrowDown') return 'down';
+    return null;
+  }
+  function isEnterKey(e) {
+    return e.keyCode === 13 || e.key === 'Enter' || e.keyCode === 32 || e.key === ' ';
+  }
+  function isBackKey(e) {
+    const k = e.keyCode;
+    const key = e.key;
+    return k === 27 || k === 461 || k === 10009 || key === 'Escape' || key === 'GoBack' || key === 'BrowserBack';
+  }
 
+  function onKeyDown(e) {
     if (isInputFocused()) {
-      // Esc → blur el input
-      if (k === 27) {
+      if (isBackKey(e)) {
         document.activeElement.blur();
         e.preventDefault();
         return;
       }
-      // Flecha abajo desde el input → salir a navegar resultados
-      if (k === 40) {
+      const dir = keyDirection(e);
+      if (dir === 'down' || dir === 'up') {
         document.activeElement.blur();
         e.preventDefault();
-        move('down');
+        move(dir);
         return;
       }
-      // Flecha arriba → blur, mover arriba
-      if (k === 38) {
-        document.activeElement.blur();
-        e.preventDefault();
-        move('up');
-        return;
-      }
-      // Resto de teclas (letras, espacio, backspace, left/right para cursor): que el input las maneje
+      // Resto: que el input las maneje (letras, espacio, cursor left/right)
       return;
     }
 
-    switch (k) {
-      case 37: e.preventDefault(); move('left'); return;
-      case 38: e.preventDefault(); move('up'); return;
-      case 39: e.preventDefault(); move('right'); return;
-      case 40: e.preventDefault(); move('down'); return;
-      case 13: // Enter
-        if (current) { e.preventDefault(); click(); }
-        return;
-      case 27:   // Esc
-      case 461:  // webOS back
-      case 10009: // Samsung back
+    const dir = keyDirection(e);
+    if (dir) {
+      e.preventDefault();
+      e.stopPropagation();
+      move(dir);
+      return;
+    }
+    if (isEnterKey(e)) {
+      if (current) {
         e.preventDefault();
-        goBack();
-        return;
+        e.stopPropagation();
+        click();
+      }
+      return;
+    }
+    if (isBackKey(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      goBack();
+      return;
     }
   }
 
-  document.addEventListener('keydown', onKeyDown);
+  // Capture phase: intercepta antes que el navegador de la TV maneje las flechas para scroll nativo
+  document.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('mousemove', () => {
     if (active) deactivate();
   });
