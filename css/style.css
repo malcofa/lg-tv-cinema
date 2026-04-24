@@ -752,52 +752,6 @@ img { display: block; max-width: 100%; }
 }
 
 /* ============================================
-   TV browser auto-zoom + touch target aumentado
-   Se activa cuando JS detecta user-agent de TV.
-   ============================================ */
-html.is-tv { zoom: 1.25; }
-html.is-tv body { -webkit-user-select: none; user-select: none; }
-html.is-tv .icon-btn { width: 48px; height: 48px; font-size: 22px; }
-html.is-tv .btn { padding: 14px 30px; }
-
-/* ============================================
-   Remote navigation focus (TV sin cursor)
-   Solo visible cuando body.remote-mode está activo.
-   ============================================ */
-body.remote-mode .tv-focused {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
-  box-shadow: 0 0 24px rgba(229, 9, 20, 0.6);
-  position: relative;
-  z-index: 10;
-  border-radius: 6px;
-}
-body.remote-mode .card.tv-focused {
-  transform: scale(1.12);
-  outline: 4px solid var(--accent);
-  outline-offset: 2px;
-  z-index: 20;
-  box-shadow: 0 10px 40px rgba(229, 9, 20, 0.5);
-}
-body.remote-mode .icon-btn.tv-focused {
-  background: var(--accent);
-  color: #fff;
-}
-body.remote-mode .btn.tv-focused {
-  transform: scale(1.06);
-}
-body.remote-mode .translate-btn.tv-focused {
-  color: var(--accent);
-  outline-offset: 1px;
-}
-body.remote-mode .hero-dot.tv-focused {
-  transform: scale(1.5);
-}
-body.remote-mode {
-  scroll-behavior: smooth;
-}
-
-/* ============================================
    Accessibility / reduced motion
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
