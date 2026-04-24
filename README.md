@@ -5,7 +5,7 @@ Plataforma tipo Netflix para películas de **dominio público** (Public Domain M
 | 🌐 URL | Para qué |
 |---|---|
 | https://malcofa.github.io/lg-tv-cinema/ | **Player web público** — responsive, mobile + desktop |
-| https://malcofa.github.io/lg-tv-cinema/tv/ | Preview del app de TV (se instala en LG webOS via `.ipk`) |
+| https://malcofa.github.io/lg-tv-cinema/app/ | Preview del app de TV (se instala en LG webOS via `.ipk`) |
 | https://malcofa.github.io/lg-tv-cinema/admin/ | Admin CRUD — edita el catálogo directo al Gist |
 
 ---
@@ -25,7 +25,7 @@ Admin CRUD (/admin/) ──► Gist público (catálogo JSON)
           ┌──────────────────┴──────────────────┐
           │                                     │
           ▼                                     ▼
-   Web Player (/)                       TV App (/tv/ → .ipk)
+   Web Player (/)                       TV App (/app/ → .ipk)
    (browsers: desktop/mobile)           (LG webOS en TV)
 ```
 
@@ -46,7 +46,7 @@ lg-tv-cinema/
 │   ├── app.js              ← UI, hero, grilla, modal, búsqueda
 │   ├── catalog.js          ← fetch + cache del Gist
 │   └── player.js           ← <video> + HLS.js condicional
-├── tv/                     ← App de TV (webOS)
+├── app/                     ← App de TV (webOS)
 │   ├── appinfo.json
 │   ├── index.html
 │   ├── icon.png / largeIcon.png / splash.png
@@ -55,7 +55,7 @@ lg-tv-cinema/
 ├── admin/
 │   └── index.html          ← CRUD con autenticación por PAT
 ├── .github/workflows/
-│   └── build-ipk.yml       ← empaqueta /tv/ → .ipk
+│   └── build-ipk.yml       ← empaqueta /app/ → .ipk
 ├── catalog-example.json
 └── README.md
 ```
@@ -79,7 +79,9 @@ Ver `js/catalog.js` — apunta al Gist público. Cualquier familiar/amigo puede 
 
 ---
 
-## 📺 App de TV (`/tv/` + `.ipk`)
+## 📺 App de TV (`/app/` + `.ipk`)
+
+Fuente del paquete webOS (se instala como app nativa en TV LG via Developer Mode). Para uso en browser de TV, ver el roadmap de `/tv/`.
 
 App webOS vanilla HTML/CSS/JS, optimizada para 1920x1080 + mando a distancia.
 
