@@ -1,10 +1,11 @@
 /**
- * Navegación espacial con mando + soporte de mouse.
- * Compatible con Chromium 38+ (ES5: var, function expressions, sin template literals).
+ * Navegación espacial con mando + soporte de mouse/cursor.
+ * Compatible Chromium 38+ (ES5).
  *
- * Key codes (webOS):
- *   37=LEFT, 38=UP, 39=RIGHT, 40=DOWN, 13=OK, 461=BACK
- *   415=PLAY, 19=PAUSE, 413=STOP
+ * Estrategia bulletproof:
+ *  - Clicks: onclick DIRECTO en cada elemento focusable (no delegation)
+ *  - Teclas: keydown global con keyCode + e.key fallback
+ *  - Back: 461 (webOS), 10009 (Samsung), 27 (ESC), 'Backspace', 'GoBack'
  */
 (function(global) {
   'use strict';
@@ -17,14 +18,14 @@
 
   var currentScreen = 'splash';
   var focusedIdx = 0;
-  var focusables = []; // [{el, group, col, row}]
-  var handlers = {};   // screen -> {onEnter, onBack, custom(key)}
+  var focusables = [];
+  var handlers = {};
 
   function log() {
-    if (global.APP_CONFIG && global.APP_CONFIG.DEBUG) {
+    if (global.APP_CONFIG && global.APP_CONFIG.DEBUG && console && console.log) {
       var args = Array.prototype.slice.call(arguments);
       args.unshift('[nav]');
-      if (console && console.log) console.log.apply(console, args);
+      console.log.apply(console, args);
     }
   }
 
@@ -44,39 +45,34 @@
     }
   }
 
-  function closestEl(el, selector) {
-    while (el && el !== document) {
-      if (el.matches && el.matches(selector)) return el;
-      // Fallback for old browsers without matches()
-      if (el.msMatchesSelector && el.msMatchesSelector(selector)) return el;
-      if (el.webkitMatchesSelector && el.webkitMatchesSelector(selector)) return el;
+  function closestRow(el, sel) {
+    while (el && el !== document.body) {
+      if (el.classList && el.classList.contains(sel)) return el;
       el = el.parentNode;
     }
     return null;
   }
 
   function scrollIntoView(el) {
-    var row = closestEl(el, '.row-items');
-    if (row) {
-      var card = el;
+    var row = closestRow(el, 'row-items');
+    if (row && row.parentElement) {
       var rowRect = row.parentElement.getBoundingClientRect();
-      var cardRect = card.getBoundingClientRect();
+      var cardRect = el.getBoundingClientRect();
       var currentTranslate = getTranslateX(row);
       var target = currentTranslate + (rowRect.left + 80 - cardRect.left);
       row.style.transform = 'translateX(' + target + 'px)';
     }
-    var rowEl = closestEl(el, '.row');
+    var rowEl = closestRow(el, 'row');
     if (rowEl) {
       var categories = document.getElementById('categories');
+      if (!categories) return;
       var rowRect2 = rowEl.getBoundingClientRect();
       var viewH = window.innerHeight;
       var currentY = getTranslateY(categories);
       if (rowRect2.top < 200) {
-        var delta = 200 - rowRect2.top;
-        categories.style.transform = 'translateY(' + (currentY + delta) + 'px)';
+        categories.style.transform = 'translateY(' + (currentY + (200 - rowRect2.top)) + 'px)';
       } else if (rowRect2.bottom > viewH - 100) {
-        var delta2 = rowRect2.bottom - (viewH - 100);
-        categories.style.transform = 'translateY(' + (currentY - delta2) + 'px)';
+        categories.style.transform = 'translateY(' + (currentY - (rowRect2.bottom - (viewH - 100))) + 'px)';
       }
     }
   }
@@ -90,16 +86,48 @@
     return m ? parseFloat(m[1]) : 0;
   }
 
+  /**
+   * Setea focusables y adjunta onclick DIRECTO en cada uno.
+   * Esto garantiza que los clicks de mouse/cursor funcionen sin
+   * depender de delegation ni de pasarse por capture phase.
+   */
   function setFocusables(items, initialIdx) {
+    // Limpiar onclicks previos para liberar referencias (RAM)
+    for (var j = 0; j < focusables.length; j++) {
+      var prev = focusables[j];
+      if (prev && prev.el && prev.el.__navClick) {
+        prev.el.onclick = null;
+        prev.el.__navClick = null;
+      }
+    }
     focusables = items || [];
     focusedIdx = typeof initialIdx === 'number' ? initialIdx : 0;
+
+    // Adjuntar onclick directo a cada focusable
+    for (var i = 0; i < focusables.length; i++) {
+      var f = focusables[i];
+      if (f && f.el) {
+        f.el.onclick = makeClickHandler(i);
+        f.el.__navClick = true;
+      }
+    }
     applyFocus();
+  }
+
+  function makeClickHandler(idx) {
+    return function(e) {
+      focusedIdx = idx;
+      applyFocus();
+      fireEnter();
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+      return false;
+    };
   }
 
   function handleArrow(dir) {
     var cur = focusables[focusedIdx];
     if (!cur) return;
-
     if (dir === KEY.LEFT || dir === KEY.RIGHT) {
       var delta = dir === KEY.RIGHT ? 1 : -1;
       var target = -1;
@@ -111,7 +139,6 @@
       if (target >= 0) { focusedIdx = target; applyFocus(); }
       return;
     }
-
     if (dir === KEY.UP || dir === KEY.DOWN) {
       var delta2 = dir === KEY.DOWN ? 1 : -1;
       var targetRow = cur.row + delta2;
@@ -133,20 +160,18 @@
   }
 
   function fireEnter() {
-    var screenHandler = handlers[currentScreen] || {};
+    var sh = handlers[currentScreen] || {};
     var f = focusables[focusedIdx];
-    if (f && screenHandler.onEnter) screenHandler.onEnter(f);
+    if (f && sh.onEnter) sh.onEnter(f);
   }
 
   function onKey(e) {
     var k = e.keyCode;
-    var screenHandler = handlers[currentScreen] || {};
-
-    if (screenHandler.custom && screenHandler.custom(k, e) === true) {
+    var sh = handlers[currentScreen] || {};
+    if (sh.custom && sh.custom(k, e) === true) {
       if (e.preventDefault) e.preventDefault();
       return;
     }
-
     if (k === KEY.LEFT || k === KEY.RIGHT || k === KEY.UP || k === KEY.DOWN) {
       handleArrow(k);
       if (e.preventDefault) e.preventDefault();
@@ -157,31 +182,10 @@
       if (e.preventDefault) e.preventDefault();
       return;
     }
-    if (k === KEY.BACK || k === KEY.ESC) {
-      if (screenHandler.onBack) screenHandler.onBack();
+    if (k === KEY.BACK || k === KEY.ESC || k === 10009 || k === 8) {
+      if (sh.onBack) sh.onBack();
       if (e.preventDefault) e.preventDefault();
       return;
-    }
-  }
-
-  /**
-   * Click global: dispara el mismo onEnter que las flechas + OK.
-   * Permite controlar la app con mouse, touchpad, o cursor del Magic Remote.
-   */
-  function onClick(e) {
-    var target = e.target;
-    // Buscar el elemento focusable más cercano
-    while (target && target !== document.body) {
-      for (var i = 0; i < focusables.length; i++) {
-        if (focusables[i].el === target) {
-          focusedIdx = i;
-          applyFocus();
-          fireEnter();
-          if (e.preventDefault) e.preventDefault();
-          return;
-        }
-      }
-      target = target.parentNode;
     }
   }
 
@@ -202,7 +206,6 @@
   function getFocused() { return focusables[focusedIdx]; }
 
   document.addEventListener('keydown', onKey, false);
-  document.addEventListener('click', onClick, false);
 
   global.Nav = {
     KEY: KEY,
