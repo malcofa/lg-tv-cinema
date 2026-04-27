@@ -1,27 +1,32 @@
 /**
  * Gestión del catálogo: fetch remoto + cache en localStorage.
+ * Compatible Chromium 38+ (ES5).
  */
 (function(global) {
   'use strict';
 
-  const CACHE_KEY = 'cinema_catalog_cache_v1';
-  const CACHE_TS_KEY = 'cinema_catalog_ts_v1';
+  var CACHE_KEY = 'cinema_catalog_cache_v1';
+  var CACHE_TS_KEY = 'cinema_catalog_ts_v1';
 
-  function log(...args) {
-    if (global.APP_CONFIG && global.APP_CONFIG.DEBUG) console.log('[catalog]', ...args);
+  function log() {
+    if (global.APP_CONFIG && global.APP_CONFIG.DEBUG && console && console.log) {
+      var args = Array.prototype.slice.call(arguments);
+      args.unshift('[catalog]');
+      console.log.apply(console, args);
+    }
   }
 
-  function now() { return Date.now(); }
+  function now() { return new Date().getTime(); }
 
   function cacheIsFresh() {
-    const ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
-    const ttlMs = (global.APP_CONFIG.CACHE_TTL_MINUTES || 5) * 60 * 1000;
+    var ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+    var ttlMs = (global.APP_CONFIG.CACHE_TTL_MINUTES || 5) * 60 * 1000;
     return ts && (now() - ts) < ttlMs;
   }
 
   function readCache() {
     try {
-      const raw = localStorage.getItem(CACHE_KEY);
+      var raw = localStorage.getItem(CACHE_KEY);
       if (!raw) return null;
       return JSON.parse(raw);
     } catch (e) {
@@ -40,14 +45,13 @@
   }
 
   function fetchWithTimeout(url, timeoutMs) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const timer = setTimeout(() => {
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      var timer = setTimeout(function() {
         xhr.abort();
         reject(new Error('Timeout al cargar catálogo'));
       }, timeoutMs);
-      // Cache buster para evitar que webOS/CDN sirvan una versión vieja.
-      const bust = (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
+      var bust = (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + new Date().getTime();
       xhr.open('GET', url + bust, true);
       xhr.onload = function() {
         clearTimeout(timer);
@@ -71,41 +75,42 @@
 
   function validate(catalog) {
     if (!catalog || typeof catalog !== 'object') throw new Error('Catálogo no es objeto');
-    if (!Array.isArray(catalog.movies)) throw new Error('catalog.movies no es array');
-    catalog.movies = catalog.movies.filter(m => m && m.id && m.title && m.video_url);
+    if (!Object.prototype.toString.call(catalog.movies) === '[object Array]' && !catalog.movies.length) {
+      throw new Error('catalog.movies no es array');
+    }
+    var clean = [];
+    for (var i = 0; i < catalog.movies.length; i++) {
+      var m = catalog.movies[i];
+      if (m && m.id && m.title && m.video_url) clean.push(m);
+    }
+    catalog.movies = clean;
     return catalog;
   }
 
-  /**
-   * Carga el catálogo. Estrategia:
-   *  - Si hay cache fresco, devuelve cache y refresca en background.
-   *  - Si no, fetchea y bloquea.
-   *  - Si el fetch falla y hay cache (aunque viejo), usa el cache como fallback.
-   */
   function load(opts) {
     opts = opts || {};
-    const forceRefresh = !!opts.forceRefresh;
-    const url = global.APP_CONFIG.CATALOG_URL;
-    const timeoutMs = global.APP_CONFIG.FETCH_TIMEOUT_MS || 10000;
-    const cached = readCache();
+    var forceRefresh = !!opts.forceRefresh;
+    var url = global.APP_CONFIG.CATALOG_URL;
+    var timeoutMs = global.APP_CONFIG.FETCH_TIMEOUT_MS || 10000;
+    var cached = readCache();
 
     if (!forceRefresh && cached && cacheIsFresh()) {
       log('cache hit (fresco)');
       fetchWithTimeout(url, timeoutMs)
         .then(validate)
         .then(writeCache)
-        .catch(e => log('bg refresh falló', e.message));
+        ['catch'](function(e) { log('bg refresh falló', e.message); });
       return Promise.resolve(cached);
     }
 
     log('fetch', url);
     return fetchWithTimeout(url, timeoutMs)
       .then(validate)
-      .then(data => {
+      .then(function(data) {
         writeCache(data);
         return data;
       })
-      .catch(err => {
+      ['catch'](function(err) {
         if (cached) {
           log('fetch falló, usando cache viejo:', err.message);
           return cached;
@@ -115,17 +120,21 @@
   }
 
   function groupByCategory(movies) {
-    const map = {};
-    movies.forEach(m => {
-      const cat = m.category || 'Sin categoría';
+    var map = {};
+    for (var i = 0; i < movies.length; i++) {
+      var m = movies[i];
+      var cat = m.category || 'Sin categoría';
       if (!map[cat]) map[cat] = [];
       map[cat].push(m);
-    });
+    }
     return map;
   }
 
   function featured(movies) {
-    const f = movies.filter(m => m.featured);
+    var f = [];
+    for (var i = 0; i < movies.length; i++) {
+      if (movies[i].featured) f.push(movies[i]);
+    }
     return f.length > 0 ? f : movies.slice(0, Math.min(5, movies.length));
   }
 

@@ -1,13 +1,18 @@
 /**
  * Orquesta todo: carga catálogo, maneja transiciones entre pantallas.
+ * Compatible Chromium 38+ (ES5).
  */
 (function(global) {
   'use strict';
 
-  let catalog = null;
+  var catalog = null;
 
-  function log(...a) {
-    if (global.APP_CONFIG && global.APP_CONFIG.DEBUG) console.log('[app]', ...a);
+  function log() {
+    if (global.APP_CONFIG && global.APP_CONFIG.DEBUG && console && console.log) {
+      var args = Array.prototype.slice.call(arguments);
+      args.unshift('[app]');
+      console.log.apply(console, args);
+    }
   }
 
   function init() {
@@ -17,12 +22,12 @@
   }
 
   function loadCatalog(forceRefresh) {
-    const statusEl = document.getElementById('splash-status');
+    var statusEl = document.getElementById('splash-status');
     if (global.Nav.getCurrentScreen() === 'splash') {
       statusEl.textContent = forceRefresh ? 'Actualizando…' : 'Cargando catálogo…';
     }
     global.Catalog.load({ forceRefresh: forceRefresh })
-      .then(data => {
+      .then(function(data) {
         catalog = data;
         if ((data.movies || []).length === 0) {
           statusEl.textContent = 'Catálogo vacío. Agregá películas al Gist.';
@@ -30,41 +35,43 @@
         }
         goHome();
       })
-      .catch(err => {
+      ['catch'](function(err) {
         log('error cargando catálogo', err);
         statusEl.textContent = 'No se pudo cargar el catálogo: ' + err.message;
       });
   }
 
+  function findHeroPlayIdx(items) {
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].group === 'hero' && items[i].col === 0) return i;
+    }
+    return 0;
+  }
+
   function goHome() {
     global.UI.renderHome(catalog);
     global.Nav.setScreen('home');
-    global.Nav.setFocusables(global.UI.buildHomeFocusables(),
-      // Foco inicial en "Reproducir" del hero si existe
-      (() => {
-        const items = global.UI.buildHomeFocusables();
-        const i = items.findIndex(x => x.group === 'hero' && x.col === 0);
-        return i >= 0 ? i : 0;
-      })()
-    );
+    var items = global.UI.buildHomeFocusables();
+    global.Nav.setFocusables(items, findHeroPlayIdx(items));
   }
 
   function goDetail(movie) {
     if (!movie) return;
     global.UI.renderDetail(movie);
     global.Nav.setScreen('detail');
-    const items = global.UI.buildDetailFocusables();
-    // Foco en "Reproducir" por defecto
-    const i = items.findIndex(x => x.el.dataset.nav === 'detail-play');
-    global.Nav.setFocusables(items, i >= 0 ? i : 0);
+    var items = global.UI.buildDetailFocusables();
+    var idx = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].el.getAttribute('data-nav') === 'detail-play') { idx = i; break; }
+    }
+    global.Nav.setFocusables(items, idx);
   }
 
   function goPlayer(movie) {
     if (!movie) return;
     global.UI.stopHeroRotation();
     global.Nav.setScreen('player');
-    global.Player.play(movie, () => {
-      // Al salir del player, volver a home (no al detalle, es más intuitivo con mando)
+    global.Player.play(movie, function() {
       goHome();
     });
   }
@@ -72,74 +79,73 @@
   function registerScreens() {
     // HOME
     global.Nav.registerScreen('home', {
-      onEnter: (f) => {
+      onEnter: function(f) {
         if (!f || !f.el) return;
-        const nav = f.el.dataset.nav;
+        var nav = f.el.getAttribute('data-nav');
         if (nav === 'refresh') {
           global.UI.showToast('Actualizando catálogo...', 2000);
           loadCatalog(true);
           return;
         }
         if (nav === 'hero-play') {
-          const m = global.UI.getHeroMovie();
-          if (m) goPlayer(m);
+          var m1 = global.UI.getHeroMovie();
+          if (m1) goPlayer(m1);
           return;
         }
         if (nav === 'hero-info') {
-          const m = global.UI.getHeroMovie();
-          if (m) goDetail(m);
+          var m2 = global.UI.getHeroMovie();
+          if (m2) goDetail(m2);
           return;
         }
         // Card de película
-        const mid = f.el.dataset.movieId;
+        var mid = f.el.getAttribute('data-movie-id');
         if (mid) {
-          const m = global.UI.findMovieById(mid);
-          if (m) goDetail(m);
+          var m3 = global.UI.findMovieById(mid);
+          if (m3) goDetail(m3);
         }
       },
-      onBack: () => {
-        // En home, BACK no hace nada (o podría minimizar la app).
-        // webOS maneja el exit con el botón HOME del mando.
+      onBack: function() {
+        // En home, BACK no hace nada
       }
     });
 
     // DETAIL
     global.Nav.registerScreen('detail', {
-      onEnter: (f) => {
+      onEnter: function(f) {
         if (!f || !f.el) return;
-        const nav = f.el.dataset.nav;
+        var nav = f.el.getAttribute('data-nav');
         if (nav === 'detail-back') { goHome(); return; }
         if (nav === 'detail-play') {
-          const mid = document.getElementById('detail').dataset.movieId;
-          const m = global.UI.findMovieById(mid);
+          var mid = document.getElementById('detail').getAttribute('data-movie-id');
+          var m = global.UI.findMovieById(mid);
           if (m) goPlayer(m);
         }
       },
-      onBack: () => goHome()
+      onBack: function() { goHome(); }
     });
 
     // PLAYER — todas las teclas van al handler del player.
     global.Nav.registerScreen('player', {
-      custom: (k) => global.Player.handleKey(k)
+      custom: function(k) { return global.Player.handleKey(k); }
     });
   }
 
-  // Arranque cuando carga DOM
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
 
-  // Visibility: cuando la TV retoma la app, refrescar cache si está viejo
-  document.addEventListener('visibilitychange', () => {
+  document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && global.Nav.getCurrentScreen() === 'home') {
       log('visible again, silent refresh');
-      global.Catalog.load({ forceRefresh: false }).then(data => {
-        catalog = data;
-        global.UI.renderHome(catalog);
-        global.Nav.setFocusables(global.UI.buildHomeFocusables(), 0);
-      }).catch(() => {});
+      global.Catalog.load({ forceRefresh: false })
+        .then(function(data) {
+          catalog = data;
+          global.UI.renderHome(catalog);
+          global.Nav.setFocusables(global.UI.buildHomeFocusables(), 0);
+        })
+        ['catch'](function() {});
     }
   });
 })(window);

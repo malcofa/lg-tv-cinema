@@ -1,49 +1,57 @@
 /**
  * Renderizado de pantallas: Home (hero + grilla), Detalle.
+ * Compatible Chromium 38+ (ES5).
  */
 (function(global) {
   'use strict';
 
-  let catalogData = null;
-  let heroRotationTimer = null;
-  let heroIndex = 0;
+  var catalogData = null;
+  var heroRotationTimer = null;
+  var heroIndex = 0;
 
+  var ESC_MAP = {
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  };
   function esc(s) {
     if (s == null) return '';
-    return String(s).replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
+    return String(s).replace(/[&<>"']/g, function(c) { return ESC_MAP[c]; });
+  }
+  // Escape de URLs para usar dentro de url("...") en CSS.
+  // Solo escapa " y \, porque las HTML entities rompen URLs.
+  function cssUrl(s) {
+    if (s == null) return '';
+    return String(s).replace(/[\\"]/g, '\\$&');
   }
 
   function formatMeta(m) {
-    const parts = [];
-    if (m.year) parts.push(`<span>${esc(m.year)}</span>`);
-    if (m.duration_min) parts.push(`<span>${m.duration_min} min</span>`);
-    if (m.rating) parts.push(`<span class="badge">★ ${esc(m.rating)}</span>`);
-    if (m.quality) parts.push(`<span class="badge">${esc(m.quality)}</span>`);
-    if (m.country) parts.push(`<span>${esc(m.country)}</span>`);
+    var parts = [];
+    if (m.year) parts.push('<span>' + esc(m.year) + '</span>');
+    if (m.duration_min) parts.push('<span>' + m.duration_min + ' min</span>');
+    if (m.rating) parts.push('<span class="badge">★ ' + esc(m.rating) + '</span>');
+    if (m.quality) parts.push('<span class="badge">' + esc(m.quality) + '</span>');
+    if (m.country) parts.push('<span>' + esc(m.country) + '</span>');
     return parts.join('');
   }
 
   function renderHero(movie) {
-    const hero = document.getElementById('hero');
+    var hero = document.getElementById('hero');
     if (!movie) return;
-    const bg = hero.querySelector('.hero-bg');
-    bg.style.backgroundImage = `url('${esc(movie.backdrop_url || movie.poster_url || '')}')`;
+    var bg = hero.querySelector('.hero-bg');
+    bg.style.backgroundImage = 'url("' + cssUrl(movie.backdrop_url || movie.poster_url || '') + '")';
     hero.querySelector('.hero-tagline').textContent = movie.tagline || 'Destacada';
     hero.querySelector('.hero-title').textContent = movie.title || '';
     hero.querySelector('.hero-meta').innerHTML = formatMeta(movie);
     hero.querySelector('.hero-synopsis').textContent = movie.synopsis || '';
-    hero.dataset.movieId = movie.id;
+    hero.setAttribute('data-movie-id', movie.id);
   }
 
   function startHeroRotation(featuredList) {
     if (heroRotationTimer) clearInterval(heroRotationTimer);
     if (!featuredList || featuredList.length <= 1) return;
-    heroRotationTimer = setInterval(() => {
+    heroRotationTimer = setInterval(function() {
       heroIndex = (heroIndex + 1) % featuredList.length;
       renderHero(featuredList[heroIndex]);
-    }, global.APP_CONFIG.HERO_ROTATION_MS || 8000);
+    }, (global.APP_CONFIG && global.APP_CONFIG.HERO_ROTATION_MS) || 8000);
   }
 
   function stopHeroRotation() {
@@ -51,98 +59,101 @@
   }
 
   function renderCategories(byCategory, order) {
-    const container = document.getElementById('categories');
+    var container = document.getElementById('categories');
     container.innerHTML = '';
     container.style.transform = 'translateY(0)';
 
-    order.forEach(catName => {
-      const movies = byCategory[catName];
-      if (!movies || movies.length === 0) return;
-      const row = document.createElement('section');
+    for (var oi = 0; oi < order.length; oi++) {
+      var catName = order[oi];
+      var movies = byCategory[catName];
+      if (!movies || movies.length === 0) continue;
+      var row = document.createElement('section');
       row.className = 'row';
-      row.innerHTML = `
-        <h3 class="row-title">${esc(catName)}</h3>
-        <div class="row-items"></div>
-      `;
-      const items = row.querySelector('.row-items');
-      movies.forEach(m => {
-        const card = document.createElement('div');
+      row.innerHTML =
+        '<h3 class="row-title">' + esc(catName) + '</h3>' +
+        '<div class="row-items"></div>';
+      var items = row.querySelector('.row-items');
+      for (var mi = 0; mi < movies.length; mi++) {
+        var m = movies[mi];
+        var card = document.createElement('div');
         card.className = 'card';
-        card.dataset.movieId = m.id;
+        card.setAttribute('data-movie-id', m.id);
         if (m.poster_url) {
-          card.style.backgroundImage = `url('${esc(m.poster_url)}')`;
+          card.style.backgroundImage = 'url("' + cssUrl(m.poster_url) + '")';
         } else {
-          card.innerHTML = `<div class="card-placeholder">🎬</div>`;
+          card.innerHTML = '<div class="card-placeholder">🎬</div>';
         }
-        const overlay = document.createElement('div');
+        var overlay = document.createElement('div');
         overlay.className = 'card-overlay';
-        overlay.innerHTML = `
-          <div class="card-title">${esc(m.title)}</div>
-          <div class="card-info">${esc(m.year || '')} · ${esc(m.duration_min ? m.duration_min + ' min' : '')}</div>
-        `;
+        overlay.innerHTML =
+          '<div class="card-title">' + esc(m.title) + '</div>' +
+          '<div class="card-info">' + esc(m.year || '') + ' · ' + esc(m.duration_min ? m.duration_min + ' min' : '') + '</div>';
         card.appendChild(overlay);
         items.appendChild(card);
-      });
+      }
       container.appendChild(row);
-    });
+    }
   }
 
   function buildHomeFocusables() {
-    const items = [];
-    // Fila 0: top bar (refresh)
-    const refreshBtn = document.querySelector('[data-nav="refresh"]');
+    var items = [];
+    var refreshBtn = document.querySelector('[data-nav="refresh"]');
     if (refreshBtn) items.push({ el: refreshBtn, group: 'top', col: 0, row: 0 });
 
-    // Fila 1: hero acciones
-    const heroPlay = document.querySelector('[data-nav="hero-play"]');
-    const heroInfo = document.querySelector('[data-nav="hero-info"]');
+    var heroPlay = document.querySelector('[data-nav="hero-play"]');
+    var heroInfo = document.querySelector('[data-nav="hero-info"]');
     if (heroPlay) items.push({ el: heroPlay, group: 'hero', col: 0, row: 1 });
     if (heroInfo) items.push({ el: heroInfo, group: 'hero', col: 1, row: 1 });
 
-    // Fila 2..N: cards por categoría
-    const rows = document.querySelectorAll('#categories .row');
-    rows.forEach((row, rowIdx) => {
-      const cards = row.querySelectorAll('.card');
-      cards.forEach((card, colIdx) => {
+    var rows = document.querySelectorAll('#categories .row');
+    for (var ri = 0; ri < rows.length; ri++) {
+      var cards = rows[ri].querySelectorAll('.card');
+      for (var ci = 0; ci < cards.length; ci++) {
         items.push({
-          el: card,
-          group: `cat-${rowIdx}`,
-          col: colIdx,
-          row: 2 + rowIdx
+          el: cards[ci],
+          group: 'cat-' + ri,
+          col: ci,
+          row: 2 + ri
         });
-      });
-    });
-
+      }
+    }
     return items;
   }
 
   function renderHome(catalog) {
     catalogData = catalog;
-    const movies = catalog.movies || [];
+    var movies = catalog.movies || [];
 
-    // Categorías: orden explícito en catalog.categories (si existe) o alfabético.
-    const byCategory = global.Catalog.groupByCategory(movies);
-    const order = (catalog.categories && catalog.categories.length)
-      ? catalog.categories.filter(c => byCategory[c])
-      : Object.keys(byCategory).sort();
+    var byCategory = global.Catalog.groupByCategory(movies);
+    var keys = [];
+    for (var k in byCategory) { if (byCategory.hasOwnProperty(k)) keys.push(k); }
 
+    var order;
+    if (catalog.categories && catalog.categories.length) {
+      order = [];
+      for (var oi = 0; oi < catalog.categories.length; oi++) {
+        var c = catalog.categories[oi];
+        if (byCategory[c]) order.push(c);
+      }
+    } else {
+      order = keys.slice().sort();
+    }
     // Agrega categorías que existan pero no estén listadas
-    Object.keys(byCategory).forEach(c => {
-      if (order.indexOf(c) < 0) order.push(c);
-    });
+    for (var ki = 0; ki < keys.length; ki++) {
+      if (order.indexOf(keys[ki]) < 0) order.push(keys[ki]);
+    }
 
-    const feat = global.Catalog.featured(movies);
+    var feat = global.Catalog.featured(movies);
     heroIndex = 0;
     renderHero(feat[0]);
     startHeroRotation(feat);
 
     renderCategories(byCategory, order);
 
-    // updated_at
-    const updEl = document.getElementById('updated-at');
+    var updEl = document.getElementById('updated-at');
     if (updEl && catalog.updated_at) {
       try {
-        const d = new Date(catalog.updated_at);
+        var d = new Date(catalog.updated_at);
         updEl.textContent = 'Actualizado ' + d.toLocaleDateString('es');
       } catch (e) { updEl.textContent = ''; }
     }
@@ -150,21 +161,24 @@
 
   function findMovieById(id) {
     if (!catalogData || !catalogData.movies) return null;
-    return catalogData.movies.find(m => m.id === id);
+    for (var i = 0; i < catalogData.movies.length; i++) {
+      if (catalogData.movies[i].id === id) return catalogData.movies[i];
+    }
+    return null;
   }
 
   function renderDetail(movie) {
     if (!movie) return;
-    const d = document.getElementById('detail');
+    var d = document.getElementById('detail');
     d.querySelector('.detail-bg').style.backgroundImage =
-      `url('${esc(movie.backdrop_url || movie.poster_url || '')}')`;
+      'url("' + cssUrl(movie.backdrop_url || movie.poster_url || '') + '")';
     d.querySelector('.detail-title').textContent = movie.title || '';
     d.querySelector('.detail-meta').innerHTML = formatMeta(movie);
     d.querySelector('.detail-tagline').textContent = movie.tagline || '';
     d.querySelector('.detail-synopsis').textContent = movie.synopsis || '';
 
-    const info = d.querySelector('.detail-info');
-    const rows = [];
+    var info = d.querySelector('.detail-info');
+    var rows = [];
     if (movie.director) rows.push(['Director', movie.director]);
     if (movie.original_title) rows.push(['Título original', movie.original_title]);
     if (movie.country) rows.push(['País', movie.country]);
@@ -174,27 +188,36 @@
     if (movie.size_gb) rows.push(['Tamaño', movie.size_gb + ' GB']);
     if (movie.source) rows.push(['Fuente', movie.source]);
     if (movie.added_by) rows.push(['Agregada por', movie.added_by]);
-    info.innerHTML = rows.map(r =>
-      `<div><strong>${esc(r[0])}:</strong> ${esc(r[1])}</div>`
-    ).join('');
+    var html = '';
+    for (var ri = 0; ri < rows.length; ri++) {
+      html += '<div><strong>' + esc(rows[ri][0]) + ':</strong> ' + esc(rows[ri][1]) + '</div>';
+    }
+    info.innerHTML = html;
 
-    d.dataset.movieId = movie.id;
+    d.setAttribute('data-movie-id', movie.id);
   }
 
   function buildDetailFocusables() {
-    const items = [];
-    const back = document.querySelector('#detail [data-nav="detail-back"]');
-    const play = document.querySelector('#detail [data-nav="detail-play"]');
+    var items = [];
+    var back = document.querySelector('#detail [data-nav="detail-back"]');
+    var play = document.querySelector('#detail [data-nav="detail-play"]');
     if (back) items.push({ el: back, group: 'detail', col: 0, row: 0 });
     if (play) items.push({ el: play, group: 'detail', col: 0, row: 1 });
     return items;
   }
 
   function showToast(msg, ms) {
-    const t = document.getElementById('error-toast');
+    var t = document.getElementById('error-toast');
     document.getElementById('error-msg').textContent = msg;
     t.classList.add('visible');
-    setTimeout(() => t.classList.remove('visible'), ms || 4000);
+    setTimeout(function() { t.classList.remove('visible'); }, ms || 4000);
+  }
+
+  function getHeroMovie() {
+    if (!catalogData) return null;
+    var hero = document.getElementById('hero');
+    if (!hero) return null;
+    return findMovieById(hero.getAttribute('data-movie-id'));
   }
 
   global.UI = {
@@ -203,7 +226,7 @@
     buildHomeFocusables: buildHomeFocusables,
     buildDetailFocusables: buildDetailFocusables,
     findMovieById: findMovieById,
-    getHeroMovie: () => catalogData && findMovieById(document.getElementById('hero').dataset.movieId),
+    getHeroMovie: getHeroMovie,
     stopHeroRotation: stopHeroRotation,
     showToast: showToast
   };
