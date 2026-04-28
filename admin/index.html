@@ -1001,9 +1001,10 @@ const OMDb = (() => {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     if (d.Response === 'False') throw new Error(d.Error || 'No encontrado');
-    fillFromOMDb(d);
-    Toast.ok('Cargado de OMDb: ' + d.Title);
+    Toast.ok('Cargado de OMDb: ' + d.Title + ' (traduciendo…)');
     document.getElementById('tmdb-results').innerHTML = '';
+    await fillFromOMDb(d);
+    Toast.ok('Cargado y traducido al español: ' + d.Title);
   }
 
   async function searchByTitle(title) {
@@ -1038,7 +1039,30 @@ const OMDb = (() => {
     });
   }
 
-  function fillFromOMDb(m) {
+  // Cache en memoria de traducciones para no repegarle a la API por el mismo texto.
+  const translateCache = new Map();
+  async function translateToEs(text) {
+    if (!text || !text.trim()) return text;
+    if (translateCache.has(text)) return translateCache.get(text);
+    try {
+      const params = new URLSearchParams({ q: text, langpair: 'en|es' });
+      const r = await fetch('https://api.mymemory.translated.net/get?' + params.toString());
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      const status = parseInt(d.responseStatus, 10);
+      const out = d.responseData && d.responseData.translatedText;
+      if (status === 200 && out) {
+        translateCache.set(text, out);
+        return out;
+      }
+      throw new Error(d.responseDetails || 'Sin traducción');
+    } catch (e) {
+      console.warn('[translate] falló:', e.message);
+      return text; // fallback al original
+    }
+  }
+
+  async function fillFromOMDb(m) {
     const ok = v => v != null && v !== '' && v !== 'N/A';
     const setIf = (id, v) => { if (ok(v)) document.getElementById(id).value = v; };
     setIf('f-title', m.Title);
@@ -1048,13 +1072,18 @@ const OMDb = (() => {
     setIf('f-director', m.Director);
     setIf('f-country', m.Country);
     setIf('f-language', m.Language);
-    setIf('f-synopsis', m.Plot);
     if (ok(m.imdbRating)) setIf('f-rating', m.imdbRating);
     if (ok(m.Poster)) setIf('f-poster_url', m.Poster);
     if (ok(m.Genre)) TagsInput.setAll('genres', m.Genre.split(',').map(g => g.trim()).filter(Boolean));
+    // Traducimos el synopsis al final (es async). Si falla, queda el original.
+    if (ok(m.Plot)) {
+      setIf('f-synopsis', m.Plot); // primero el original, por si la API tarda
+      const translated = await translateToEs(m.Plot);
+      setIf('f-synopsis', translated);
+    }
   }
 
-  return { selectById, searchByTitle };
+  return { selectById, searchByTitle, translateToEs };
 })();
 
 /* =================================================================
@@ -1568,8 +1597,9 @@ const Enrich = (() => {
 
   /**
    * Convierte respuesta cruda de OMDb a nuestro schema.
+   * El synopsis se traduce al español (en→es) via OMDb.translateToEs (MyMemory).
    */
-  function omdbToSchema(m) {
+  async function omdbToSchema(m) {
     const ok = v => v != null && v !== '' && v !== 'N/A';
     const out = {};
     if (ok(m.Title)) out.title = m.Title;
@@ -1579,7 +1609,10 @@ const Enrich = (() => {
     if (ok(m.Director)) out.director = m.Director;
     if (ok(m.Country)) out.country = m.Country;
     if (ok(m.Language)) out.language = m.Language;
-    if (ok(m.Plot)) out.synopsis = m.Plot;
+    if (ok(m.Plot)) {
+      // Traducción async del synopsis (cache en memoria)
+      out.synopsis = await OMDb.translateToEs(m.Plot);
+    }
     if (ok(m.imdbRating)) { const r = parseFloat(m.imdbRating); if (!isNaN(r)) out.rating = r; }
     if (ok(m.Poster)) out.poster_url = m.Poster;
     if (ok(m.Genre)) out.genres = m.Genre.split(',').map(g => g.trim()).filter(Boolean);
@@ -1654,7 +1687,7 @@ const Enrich = (() => {
           await sleep(80);
           continue;
         }
-        const data = omdbToSchema(raw);
+        const data = await omdbToSchema(raw);
         if (Object.keys(data).length > 0) {
           enrichments.push({ movieId: m.id, data });
           results.enriched++;
