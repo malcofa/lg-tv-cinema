@@ -137,11 +137,15 @@
       video.removeAttribute('src');
       video.load();
     } catch (e) {}
-    // Blur iframe primero para liberar el foco DOM antes del cambio de src.
-    // Sin esto, document.activeElement queda como el iframe y las teclas
-    // siguen yendo a él en vez de a nuestro handler.
+    // Liberar el foco del iframe en el orden correcto:
+    // 1) blur explícito
+    // 2) cambiar src a blank
+    // 3) ocultarlo con display:none (saca al iframe del render/focus tree)
+    // 4) refocusar body como fallback
     try { iframe.blur(); } catch (eB) {}
     try { iframe.src = 'about:blank'; } catch (e2) {}
+    iframe.classList.add('hidden');
+    video.classList.add('hidden');
     try { document.body.focus(); } catch (e3) {}
     overlay.classList.remove('visible');
     if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }

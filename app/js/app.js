@@ -153,13 +153,42 @@
   // el back al nivel del sistema, no del DOM.
   window.addEventListener('popstate', function(e) {
     log('popstate', e && e.state);
-    if (global.Nav.getCurrentScreen() === 'player') {
+    var prevScreen = global.Nav.getCurrentScreen();
+    if (prevScreen === 'player') {
       global.Player.stop();
       goHome();
-    } else if (global.Nav.getCurrentScreen() === 'detail') {
+      // Re-fuerza el foco DOM al elemento actualmente focuseado.
+      // Sin esto, después de salir del iframe, las teclas no llegan al app.
+      restoreFocusAfterPlayer();
+    } else if (prevScreen === 'detail') {
       goHome();
+      restoreFocusAfterPlayer();
     }
   });
+
+  function restoreFocusAfterPlayer() {
+    var attempts = [50, 200, 500];
+    for (var i = 0; i < attempts.length; i++) {
+      (function(delay) {
+        setTimeout(function() {
+          // Forzar focus DOM al focusable actual
+          var f = global.Nav.getFocused();
+          if (f && f.el && f.el.focus) {
+            try { f.el.focus(); } catch (e) {}
+          } else {
+            try { document.body.focus(); } catch (e) {}
+          }
+          // Click sintético en body para "despertar" la captura de eventos en webOS
+          try {
+            var evt = document.createEvent('MouseEvents');
+            evt.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0,
+              false, false, false, false, 0, null);
+            document.body.dispatchEvent(evt);
+          } catch (ev) {}
+        }, delay);
+      })(attempts[i]);
+    }
+  }
 
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && global.Nav.getCurrentScreen() === 'home') {
