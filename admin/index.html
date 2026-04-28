@@ -1638,7 +1638,129 @@ const Enrich = (() => {
     return m;
   }
 
+  /** Consulta por IMDb ID — devuelve la peli completa con todos los campos. */
+  async function queryOMDbByImdbId(imdbId) {
+    const s = Settings.get();
+    if (!s.omdb) throw new Error('OMDb key no configurada');
+    const url = new URL('https://www.omdbapi.com/');
+    url.searchParams.set('apikey', s.omdb);
+    url.searchParams.set('i', imdbId);
+    url.searchParams.set('plot', 'full');
+    const r = await fetch(url.toString());
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (d.Response === 'False') return null;
+    return d;
+  }
+
+  /** Búsqueda fuzzy en OMDb (endpoint s=). Devuelve array de candidatos básicos. */
+  async function searchOMDb(query, year) {
+    const s = Settings.get();
+    if (!s.omdb || !query) return [];
+    const url = new URL('https://www.omdbapi.com/');
+    url.searchParams.set('apikey', s.omdb);
+    url.searchParams.set('s', query);
+    url.searchParams.set('type', 'movie');
+    if (year) url.searchParams.set('y', String(year));
+    const r = await fetch(url.toString());
+    if (!r.ok) return [];
+    const d = await r.json();
+    if (d.Response !== 'True') return [];
+    return d.Search || [];
+  }
+
+  /**
+   * Normaliza un título para matching más tolerante:
+   *  - lowercase, sin tildes
+   *  - sin paréntesis/corchetes (años, "(2019)", "[HD]")
+   *  - sin keywords de calidad (720p, 1080p, BluRay, HD, etc.)
+   *  - sin puntuación, espacios colapsados
+   */
+  function normalizeForMatch(title) {
+    return String(title || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\(\[][^\)\]]*[\)\]]/g, ' ')
+      .replace(/\b(720p|1080p|2160p|4k|hd|sd|bluray|blu-ray|dvdrip|webrip|web-dl|webdl|hdrip|brrip|x264|x265|h264|h265|aac|ac3|dts|extended|director'?s?\s*cut|remastered|unrated)\b/gi, ' ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /** Dice coefficient sobre bigramas. 1.0 = idéntico, 0 = nada en común. */
+  function similarity(a, b) {
+    a = String(a || ''); b = String(b || '');
+    if (a === b) return 1;
+    if (a.length < 2 || b.length < 2) return 0;
+    const bigrams = function(s) {
+      const arr = [];
+      for (let i = 0; i < s.length - 1; i++) arr.push(s.substr(i, 2));
+      return arr;
+    };
+    const aB = bigrams(a), bB = bigrams(b);
+    const bMap = {};
+    bB.forEach(g => { bMap[g] = (bMap[g] || 0) + 1; });
+    let inter = 0;
+    aB.forEach(g => { if (bMap[g] > 0) { inter++; bMap[g]--; } });
+    return (2 * inter) / (aB.length + bB.length);
+  }
+
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /**
+   * Estrategia multi-step para hacer match contra OMDb:
+   *  1. t= con título + año exacto
+   *  2. t= con título sin año (a veces el año está mal)
+   *  3. t= con título normalizado + año
+   *  4. t= con título normalizado sin año
+   *  5. Sacar artículo inicial (the/los/las/el/la) y reintentar
+   *  6. s= search fuzzy + scoring por similitud (Dice + bonus por año)
+   * Retorna { raw, strategy } o null.
+   */
+  async function queryOMDbBest(title, year) {
+    const tries = [];
+    const norm = normalizeForMatch(title);
+    const stripArt = norm.replace(/^(the|el|la|los|las|un|una|a|an)\s+/, '');
+
+    tries.push({ q: title, y: year, label: 'exact+year' });
+    tries.push({ q: title, y: null, label: 'exact-noyear' });
+    if (norm && norm !== title.toLowerCase()) {
+      tries.push({ q: norm, y: year, label: 'normalized+year' });
+      tries.push({ q: norm, y: null, label: 'normalized-noyear' });
+    }
+    if (stripArt && stripArt !== norm) {
+      tries.push({ q: stripArt, y: year, label: 'no-article+year' });
+      tries.push({ q: stripArt, y: null, label: 'no-article-noyear' });
+    }
+
+    for (let i = 0; i < tries.length; i++) {
+      const t = tries[i];
+      try {
+        const r = await queryOMDbByTitle(t.q, t.y);
+        if (r) return { raw: r, strategy: t.label };
+      } catch (e) { /* sigue al siguiente */ }
+      await sleep(40);
+    }
+
+    // 6. Fallback: search fuzzy
+    const candidates = await searchOMDb(stripArt || norm || title, null);
+    if (candidates.length === 0) return null;
+    const target = norm;
+    let best = null;
+    let bestScore = 0;
+    candidates.forEach(c => {
+      const s = similarity(target, normalizeForMatch(c.Title));
+      const yMatch = year && c.Year ? Math.abs(parseInt(c.Year, 10) - year) : null;
+      const yBonus = yMatch === 0 ? 0.25 : (yMatch === 1 ? 0.10 : 0);
+      const score = s + yBonus;
+      if (score > bestScore) { bestScore = score; best = c; }
+    });
+    if (best && bestScore > 0.55) {
+      const full = await queryOMDbByImdbId(best.imdbID);
+      if (full) return { raw: full, strategy: 'search-fuzzy(' + Math.round(bestScore * 100) + '%)' };
+    }
+    return null;
+  }
 
   /**
    * Recorre todas las pelis sin poster O sin director, consulta OMDb por
@@ -1670,7 +1792,7 @@ const Enrich = (() => {
 
   async function runBulkEnrich(candidates) {
     const statusEl = document.getElementById('save-status');
-    const results = { enriched: 0, notFound: [], errors: [] };
+    const results = { enriched: 0, notFound: [], errors: [], strategies: {} };
     const enrichments = [];
 
     for (let i = 0; i < candidates.length; i++) {
@@ -1681,13 +1803,16 @@ const Enrich = (() => {
       }
       try {
         const { cleanTitle, year } = parseTitleAndYear(m.title, m.year);
-        const raw = await queryOMDbByTitle(cleanTitle, year);
-        if (!raw) {
+        // Estrategia multi-step: prueba 6+ variantes hasta encontrar match
+        const found = await queryOMDbBest(cleanTitle, year);
+        if (!found) {
           results.notFound.push(m.title);
           await sleep(80);
           continue;
         }
-        const data = await omdbToSchema(raw);
+        // Trackeamos qué estrategia funcionó (para logs/debug)
+        results.strategies[found.strategy] = (results.strategies[found.strategy] || 0) + 1;
+        const data = await omdbToSchema(found.raw);
         if (Object.keys(data).length > 0) {
           enrichments.push({ movieId: m.id, data });
           results.enriched++;
@@ -1723,6 +1848,7 @@ const Enrich = (() => {
     Toast.ok(msg);
 
     // Log útil para debug
+    console.log('[bulkEnrich] Estrategias usadas:', results.strategies);
     if (results.notFound.length) {
       console.log('[bulkEnrich] No encontradas en OMDb:', results.notFound);
     }
