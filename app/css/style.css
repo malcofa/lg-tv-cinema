@@ -450,6 +450,11 @@ button {
   background: #e50914;
   border-color: #fff;
 }
+.back-btn.player-back-fixed.back-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
 .player-info {
   position: absolute;
   top: 40px; left: 50%;
