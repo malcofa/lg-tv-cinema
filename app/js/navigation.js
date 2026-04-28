@@ -20,6 +20,7 @@
   var focusedIdx = 0;
   var focusables = [];
   var handlers = {};
+  var lastFocusedEl = null; // Cache del último focuseado (optimización)
 
   function log() {
     if (global.APP_CONFIG && global.APP_CONFIG.DEBUG && console && console.log) {
@@ -29,18 +30,16 @@
     }
   }
 
-  function clearFocus() {
-    for (var i = 0; i < focusables.length; i++) {
-      var f = focusables[i];
-      if (f && f.el) f.el.classList.remove('focused');
-    }
-  }
-
   function applyFocus() {
-    clearFocus();
+    // Optimización: solo modificamos el viejo y el nuevo (no iteramos los 50+ cards).
+    if (lastFocusedEl) {
+      lastFocusedEl.classList.remove('focused');
+      lastFocusedEl = null;
+    }
     var f = focusables[focusedIdx];
     if (f && f.el) {
       f.el.classList.add('focused');
+      lastFocusedEl = f.el;
       scrollIntoView(f.el);
     }
   }
@@ -99,6 +98,11 @@
         prev.el.onclick = null;
         prev.el.__navClick = null;
       }
+    }
+    // Limpiar último foco si pertenece al set anterior
+    if (lastFocusedEl) {
+      lastFocusedEl.classList.remove('focused');
+      lastFocusedEl = null;
     }
     focusables = items || [];
     focusedIdx = typeof initialIdx === 'number' ? initialIdx : 0;
@@ -165,6 +169,10 @@
     if (f && sh.onEnter) sh.onEnter(f);
   }
 
+  // Throttle para evitar que pulsaciones rápidas del mando colapsen el render.
+  var lastNavTime = 0;
+  var NAV_THROTTLE_MS = 90;
+
   function onKey(e) {
     var k = e.keyCode;
     var sh = handlers[currentScreen] || {};
@@ -173,6 +181,12 @@
       return;
     }
     if (k === KEY.LEFT || k === KEY.RIGHT || k === KEY.UP || k === KEY.DOWN) {
+      var now = (new Date()).getTime();
+      if (now - lastNavTime < NAV_THROTTLE_MS) {
+        if (e.preventDefault) e.preventDefault();
+        return;
+      }
+      lastNavTime = now;
       handleArrow(k);
       if (e.preventDefault) e.preventDefault();
       return;

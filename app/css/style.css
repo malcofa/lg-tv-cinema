@@ -221,7 +221,7 @@ button {
   font-size: 20px;
   font-weight: 700;
   border-radius: 4px;
-  transition: transform 0.2s, background 0.2s;
+  /* sin transition: en TVs Chromium 53/68 las animaciones encadenadas laguean */
 }
 .btn-primary {
   background: #fff;
@@ -249,7 +249,8 @@ button {
   margin-top: 0;
   padding: 20px 0 60px;
   z-index: 1;
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* sin transition: el scroll vertical es instantáneo (mucho más fluido en TV) */
+  will-change: transform;
 }
 .row {
   margin-bottom: 40px;
@@ -263,7 +264,8 @@ button {
 }
 .row-items {
   display: flex;
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* sin transition: scroll horizontal instantáneo */
+  will-change: transform;
 }
 .row-items > * + * { margin-left: 15px; }
 
@@ -276,21 +278,16 @@ button {
   background-size: cover;
   background-position: center;
   position: relative;
-  transition: transform 0.25s, box-shadow 0.25s;
   overflow: hidden;
   cursor: pointer;
+  /* sin transitions: feedback inmediato al cambiar foco */
+  border: 4px solid transparent;
+  box-sizing: border-box;
 }
 .card.focused {
-  transform: scale(1.1);
-  box-shadow: 0 10px 40px rgba(229,9,20,0.6);
+  /* Sin scale (era expensive). Borde sólido del mismo tamaño que el placeholder. */
+  border-color: #e50914;
   z-index: 10;
-}
-.card.focused::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border: 4px solid #e50914;
-  border-radius: 6px;
 }
 .card-overlay {
   position: absolute;
@@ -298,7 +295,6 @@ button {
   padding: 15px;
   background: linear-gradient(to top, rgba(0,0,0,0.95), transparent);
   opacity: 0;
-  transition: opacity 0.25s;
 }
 .card.focused .card-overlay { opacity: 1; }
 .card-title {

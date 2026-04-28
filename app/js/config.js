@@ -15,8 +15,8 @@ window.APP_CONFIG = {
   // Timeout del fetch (ms).
   FETCH_TIMEOUT_MS: 10000,
 
-  // Cantidad de ítems del hero rotatorio (los primeros featured del catálogo).
-  HERO_ROTATION_MS: 8000,
+  // Intervalo de rotación del hero en ms. Más alto = menos repaints (mejor para TVs antiguas).
+  HERO_ROTATION_MS: 15000,
 
   // Debug: muestra logs en consola.
   DEBUG: true
