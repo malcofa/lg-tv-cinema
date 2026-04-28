@@ -78,6 +78,7 @@
         var card = document.createElement('div');
         card.className = 'card';
         card.setAttribute('data-movie-id', m.id);
+        card.setAttribute('tabindex', '0'); // necesario para .focus() nativo
         if (m.poster_url) {
           card.style.backgroundImage = 'url("' + cssUrl(m.poster_url) + '")';
         } else {

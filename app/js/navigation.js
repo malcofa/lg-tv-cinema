@@ -39,6 +39,10 @@
     if (f && f.el) {
       f.el.classList.add('focused');
       lastFocusedEl = f.el;
+      // Foco DOM nativo: necesario para que las teclas vuelvan a llegar a
+      // nuestro handler después de que el iframe haya capturado el foco.
+      try { f.el.focus({ preventScroll: true }); }
+      catch (e) { try { f.el.focus(); } catch (e2) {} }
       scrollIntoView(f.el);
       updateHeroVisibility(f);
     }

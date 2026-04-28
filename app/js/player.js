@@ -137,7 +137,12 @@
       video.removeAttribute('src');
       video.load();
     } catch (e) {}
+    // Blur iframe primero para liberar el foco DOM antes del cambio de src.
+    // Sin esto, document.activeElement queda como el iframe y las teclas
+    // siguen yendo a él en vez de a nuestro handler.
+    try { iframe.blur(); } catch (eB) {}
     try { iframe.src = 'about:blank'; } catch (e2) {}
+    try { document.body.focus(); } catch (e3) {}
     overlay.classList.remove('visible');
     if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
   }
