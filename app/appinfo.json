@@ -1,6 +1,6 @@
 {
   "id": "com.malcofa.cinema",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "vendor": "malcofa",
   "type": "web",
   "main": "index.html",
@@ -11,6 +11,6 @@
   "resolution": "1920x1080",
   "splashBackground": "splash.png",
   "requiredPermissions": ["internet"],
-  "disableBackHistoryAPI": true,
+  "disableBackHistoryAPI": false,
   "supportTouchMode": "virtual"
 }

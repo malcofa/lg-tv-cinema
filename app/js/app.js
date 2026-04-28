@@ -71,6 +71,15 @@
     if (!movie) return;
     global.UI.stopHeroRotation();
     global.Nav.setScreen('player');
+    // Push una entrada al history. Cuando webOS dispare history.back() (Back del mando),
+    // el browser pop-eará → fire popstate → nuestro handler sale del player.
+    // Esto bypasea el problema de iframe-captura-foco porque webOS maneja Back al
+    // nivel del sistema operativo.
+    try {
+      if (history && history.pushState) {
+        history.pushState({ screen: 'player', t: Date.now() }, '', '#player');
+      }
+    } catch (e) {}
     global.Player.play(movie, function() {
       goHome();
     });
@@ -137,6 +146,20 @@
   } else {
     init();
   }
+
+  // popstate: webOS Back triggers browser history.back() (con disableBackHistoryAPI:false).
+  // Cuando estamos en el player → significa que el usuario presionó Back → salimos.
+  // Esto FUNCIONA incluso si el iframe tiene el foco, porque webOS dispara
+  // el back al nivel del sistema, no del DOM.
+  window.addEventListener('popstate', function(e) {
+    log('popstate', e && e.state);
+    if (global.Nav.getCurrentScreen() === 'player') {
+      global.Player.stop();
+      goHome();
+    } else if (global.Nav.getCurrentScreen() === 'detail') {
+      goHome();
+    }
+  });
 
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && global.Nav.getCurrentScreen() === 'home') {
