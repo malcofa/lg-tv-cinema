@@ -36,15 +36,15 @@
   }
 
   /**
-   * Muestra el botón "Volver". En modo embed se queda visible siempre porque
-   * el iframe captura el foco y nuestras teclas no llegan a este handler.
-   * En modo directo, auto-oculta tras 3s sin interacción.
+   * Muestra el botón "Volver". Auto-oculta tras 3s sin interacción.
+   * Por defecto el botón está oculto. Solo aparece al mover el mouse o presionar
+   * teclas (modo direct). En modo embed las teclas las captura el iframe, así
+   * que el botón solo se muestra con mouse — pero tu mando tiene Back para salir.
    */
   function showBackBtn() {
     if (!backBtn) return;
     backBtn.classList.remove('back-hidden');
     if (backBtnTimer) clearTimeout(backBtnTimer);
-    if (mode === 'embed') return; // siempre visible en embed
     backBtnTimer = setTimeout(function() {
       if (backBtn) backBtn.classList.add('back-hidden');
     }, BACK_HIDE_MS);
@@ -105,7 +105,9 @@
       }
     }
     showOverlay();
-    showBackBtn();
+    // El botón "Volver" arranca oculto. Solo aparece al mover el mouse.
+    // Para salir con mando se usa la tecla Back (461) que llega via handleKey.
+    if (backBtn) backBtn.classList.add('back-hidden');
   }
 
   function stop() {
