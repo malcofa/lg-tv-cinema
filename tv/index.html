@@ -1,104 +1,95 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cinema Premium — Smart TV</title>
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=1920, user-scalable=no">
+  <title>Cinema Premium</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
-<header class="site-header">
-  <h1 class="brand">CINEMA <span>PREMIUM</span></h1>
-  <nav class="header-actions">
-    <button class="icon-btn" id="btn-search" tabindex="0" aria-label="Buscar">🔎</button>
-    <button class="icon-btn" id="btn-refresh" tabindex="0" aria-label="Actualizar">↻</button>
-  </nav>
-</header>
-
-<div class="search-bar hidden" id="search-bar">
-  <input type="search" id="search-input" placeholder="Buscar…" tabindex="0">
-  <button class="icon-btn" id="btn-search-close" tabindex="0" aria-label="Cerrar búsqueda">✕</button>
-</div>
-
-<section class="hero" id="hero" aria-label="Película destacada">
-  <div class="hero-bg" id="hero-bg"></div>
-  <div class="hero-gradient"></div>
-  <div class="hero-content">
-    <p class="hero-label">DESTACADA</p>
-    <h2 id="hero-title" class="hero-title"></h2>
-    <div class="hero-meta" id="hero-meta"></div>
-    <p class="hero-synopsis" id="hero-synopsis"></p>
-    <div class="hero-actions">
-      <button class="btn btn-primary" id="hero-play" tabindex="0">
-        <span class="icon">▶</span> Reproducir
-      </button>
-      <button class="btn btn-secondary" id="hero-info" tabindex="0">
-        <span class="icon">ⓘ</span> Más información
-      </button>
+<div id="tv-root">
+  <!-- Splash / Loading -->
+  <div id="splash" class="screen active">
+    <div class="splash-content">
+      <h1 class="logo">CINEMA <span>PREMIUM</span></h1>
+      <div class="loader"></div>
+      <p id="splash-status">Cargando catálogo...</p>
     </div>
   </div>
-  <div class="hero-dots" id="hero-dots"></div>
-</section>
 
-<div class="loading-state" id="loading-state">
-  <div class="spinner"></div>
-  <p>Cargando catálogo…</p>
-</div>
+  <!-- Home: Hero + Grilla -->
+  <div id="home" class="screen">
+    <header class="top-bar">
+      <h1 class="brand">CINEMA <span>PREMIUM</span></h1>
+      <div class="top-actions">
+        <button class="top-btn" data-nav="refresh">↻ Refrescar</button>
+        <span id="updated-at" class="updated"></span>
+      </div>
+    </header>
 
-<div class="error-state hidden" id="error-state">
-  <h2>😕 No pudimos cargar el catálogo</h2>
-  <p id="error-message"></p>
-  <button class="btn btn-primary" onclick="location.reload()" tabindex="0">Reintentar</button>
-</div>
+    <section id="hero" class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-gradient"></div>
+      <div class="hero-content">
+        <p class="hero-tagline"></p>
+        <h2 class="hero-title"></h2>
+        <div class="hero-meta"></div>
+        <p class="hero-synopsis"></p>
+        <div class="hero-actions">
+          <button class="btn-primary" data-nav="hero-play">▶ Reproducir</button>
+          <button class="btn-secondary" data-nav="hero-info">+ Más información</button>
+        </div>
+      </div>
+    </section>
 
-<main class="categories" id="categories"></main>
+    <main id="categories" class="categories"></main>
+  </div>
 
-<section class="search-results hidden" id="search-results">
-  <h2 class="section-title">Resultados</h2>
-  <div class="grid" id="search-grid"></div>
-  <p class="empty-search hidden" id="empty-search">Sin resultados.</p>
-</section>
-
-<footer class="site-footer">
-  <p>🎬 Cinema Premium — Smart TV</p>
-</footer>
-
-<!-- Detail modal -->
-<div class="modal hidden" id="detail-modal" role="dialog" aria-modal="true">
-  <div class="modal-bg" id="modal-bg"></div>
-  <button class="modal-close" id="modal-close" tabindex="0" aria-label="Cerrar">✕</button>
-  <div class="modal-content">
-    <h2 class="modal-title" id="modal-title"></h2>
-    <div class="modal-meta" id="modal-meta"></div>
-    <p class="modal-tagline" id="modal-tagline"></p>
-    <p class="modal-synopsis" id="modal-synopsis"></p>
-    <button class="translate-btn hidden" id="translate-btn" tabindex="0" type="button">🌐 Traducir</button>
-    <div class="modal-info" id="modal-info"></div>
-    <div class="modal-actions">
-      <button class="btn btn-primary" id="modal-play" tabindex="0">
-        <span class="icon">▶</span> Reproducir
-      </button>
+  <!-- Detalle de película -->
+  <div id="detail" class="screen">
+    <div class="detail-bg"></div>
+    <div class="detail-gradient"></div>
+    <button class="back-btn" data-nav="detail-back">← Volver</button>
+    <div class="detail-content">
+      <h2 class="detail-title"></h2>
+      <div class="detail-meta"></div>
+      <p class="detail-tagline"></p>
+      <p class="detail-synopsis"></p>
+      <div class="detail-info"></div>
+      <div class="detail-actions">
+        <button class="btn-primary" data-nav="detail-play">▶ Reproducir</button>
+      </div>
     </div>
+  </div>
+
+  <!-- Player -->
+  <div id="player" class="screen">
+    <video id="video" preload="metadata"></video>
+    <iframe id="video-iframe" class="hidden"
+      allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+      allowfullscreen></iframe>
+    <!-- Back button siempre visible, FUERA del overlay (que se auto-oculta) -->
+    <button class="back-btn player-back-fixed" data-nav="player-back">← Volver</button>
+    <div id="player-overlay" class="player-overlay">
+      <div class="player-info">
+        <h3 id="player-title"></h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error toast -->
+  <div id="error-toast" class="toast">
+    <p id="error-msg"></p>
   </div>
 </div>
 
-<!-- Player -->
-<div class="player-overlay hidden" id="player-overlay">
-  <video id="player-video" controls playsinline></video>
-  <iframe id="player-iframe" class="hidden"
-    allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-    allowfullscreen
-    sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups-to-escape-sandbox"
-    referrerpolicy="no-referrer"></iframe>
-  <button class="player-close" id="player-close" tabindex="0" aria-label="Cerrar">✕</button>
-  <div class="player-title-bar" id="player-title-bar"></div>
-</div>
-
-<!-- Toast -->
-<div class="toast" id="toast"></div>
-
+<script src="js/fit-viewport.js"></script>
+<script src="js/config.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/player.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
