@@ -74,11 +74,8 @@
     global.Player.play(movie, function() {
       goHome();
     });
-    // Registrar el back button como focusable así Click + Enter funcionan
-    var backBtn = document.querySelector('#player [data-nav="player-back"]');
-    if (backBtn) {
-      global.Nav.setFocusables([{ el: backBtn, group: 'player', col: 0, row: 0 }]);
-    }
+    // Player sin focusables: todas las teclas las maneja Player.handleKey
+    global.Nav.setFocusables([]);
   }
 
   function registerScreens() {
@@ -129,15 +126,8 @@
       onBack: function() { goHome(); }
     });
 
-    // PLAYER — onEnter para click en back button + custom para teclas del mando
+    // PLAYER — todas las teclas las maneja Player.handleKey
     global.Nav.registerScreen('player', {
-      onEnter: function(f) {
-        if (!f || !f.el) return;
-        if (f.el.getAttribute('data-nav') === 'player-back') {
-          global.Player.stop();
-          goHome();
-        }
-      },
       custom: function(k) { return global.Player.handleKey(k); }
     });
   }
