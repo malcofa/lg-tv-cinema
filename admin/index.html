@@ -547,8 +547,11 @@
           Podés pegar:
           <b>URL de TMDB</b> (<code>themoviedb.org/movie/1086260</code>) ·
           <b>URL de IMDb</b> (<code>imdb.com/title/tt0013442</code>) ·
-          <b>ID numérico</b> TMDB · <b>ID IMDb</b> (<code>tt0013442</code>) ·
+          <b>URL de OMDb</b> (<code>omdbapi.com/?...&i=tt0013442</code>) ·
+          <b>ID</b> TMDB o IMDb (<code>tt0013442</code>) ·
           o simplemente <b>el título</b>.
+          <br>
+          <span style="color: #4ade80">📝 La sinopsis se traduce al español automáticamente.</span>
         </div>
         <div id="tmdb-results" class="tmdb-results"></div>
       </div>
@@ -902,12 +905,13 @@ const TMDB = (() => {
       return;
     }
 
-    // Detectar URL/ID de IMDB
+    // Detectar URL/ID de IMDB o URL de OMDb API (?i=ttXXX)
     const imdbUrl = q.match(/imdb\.com\/title\/(tt\d+)/i);
+    const omdbApiUrl = q.match(/[\?&]i=(tt\d+)/i);
     const imdbId = /^tt\d+$/i.test(q);
-    if (imdbUrl || imdbId) {
+    if (imdbUrl || imdbId || omdbApiUrl) {
       if (!s.omdb) return Toast.err('Necesitas OMDb key para IDs de IMDB');
-      const id = imdbUrl ? imdbUrl[1] : q;
+      const id = imdbUrl ? imdbUrl[1] : (omdbApiUrl ? omdbApiUrl[1] : q);
       box.innerHTML = '<em style="color:#666">Cargando IMDb ' + id + '...</em>';
       try { await OMDb.selectById(id); box.innerHTML = ''; }
       catch (e) { box.innerHTML = `<em style="color:var(--danger)">${e.message}</em>`; }
@@ -1516,6 +1520,9 @@ const Enrich = (() => {
     // URL de IMDb
     m = s.match(/imdb\.com\/title\/(tt\d+)/i);
     if (m) return { provider: 'omdb', id: m[1] };
+    // URL de OMDb API (https://www.omdbapi.com/?apikey=XXX&i=ttYYY o cualquier query con i=tt...)
+    m = s.match(/[\?&]i=(tt\d+)/i);
+    if (m) return { provider: 'omdb', id: m[1] };
     // IMDb ID suelto
     if (/^tt\d+$/i.test(s)) return { provider: 'omdb', id: s };
     // Número suelto → TMDB
@@ -1567,7 +1574,10 @@ const Enrich = (() => {
     if (ok(m.Director)) out.director = m.Director;
     if (ok(m.Country)) out.country = m.Country;
     if (ok(m.Language)) out.language = m.Language;
-    if (ok(m.Plot)) out.synopsis = m.Plot;
+    if (ok(m.Plot)) {
+      // Traducción async del synopsis (en→es) — usa cache de OMDb.translateToEs
+      out.synopsis = await OMDb.translateToEs(m.Plot);
+    }
     if (ok(m.imdbRating)) out.rating = parseFloat(m.imdbRating);
     if (ok(m.Poster)) out.poster_url = m.Poster;
     if (ok(m.Genre)) out.genres = m.Genre.split(',').map(g => g.trim()).filter(Boolean);
