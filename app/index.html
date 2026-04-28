@@ -69,8 +69,9 @@
     <iframe id="video-iframe" class="hidden"
       allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
       allowfullscreen></iframe>
+    <!-- Back button siempre visible, FUERA del overlay (que se auto-oculta) -->
+    <button class="back-btn player-back-fixed" data-nav="player-back">← Volver</button>
     <div id="player-overlay" class="player-overlay">
-      <button class="back-btn" data-nav="player-back">← Volver</button>
       <div class="player-info">
         <h3 id="player-title"></h3>
       </div>
