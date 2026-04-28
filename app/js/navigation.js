@@ -31,7 +31,6 @@
   }
 
   function applyFocus() {
-    // Optimización: solo modificamos el viejo y el nuevo (no iteramos los 50+ cards).
     if (lastFocusedEl) {
       lastFocusedEl.classList.remove('focused');
       lastFocusedEl = null;
@@ -41,6 +40,23 @@
       f.el.classList.add('focused');
       lastFocusedEl = f.el;
       scrollIntoView(f.el);
+      updateHeroVisibility(f);
+    }
+  }
+
+  /**
+   * Oculta el hero cuando el foco baja a las filas de categorías (row >= 2).
+   * Lo muestra cuando el foco está en topbar (row 0) o hero (row 1).
+   * Evita que el hero quede solapando los row titles cuando categories
+   * se traslada hacia arriba con translateY.
+   */
+  function updateHeroVisibility(f) {
+    var hero = document.getElementById('hero');
+    if (!hero) return;
+    if (f && f.row >= 2) {
+      hero.classList.add('hero-hidden');
+    } else {
+      hero.classList.remove('hero-hidden');
     }
   }
 
@@ -53,6 +69,7 @@
   }
 
   function scrollIntoView(el) {
+    // Horizontal: card dentro de una row-items
     var row = closestRow(el, 'row-items');
     if (row && row.parentElement) {
       var rowRect = row.parentElement.getBoundingClientRect();
@@ -61,10 +78,12 @@
       var target = currentTranslate + (rowRect.left + 80 - cardRect.left);
       row.style.transform = 'translateX(' + target + 'px)';
     }
+    // Vertical: si estamos dentro de una .row, ajustar categories.
+    // Si NO estamos en una row (hero, top-bar), resetear categories al inicio.
+    var categories = document.getElementById('categories');
+    if (!categories) return;
     var rowEl = closestRow(el, 'row');
     if (rowEl) {
-      var categories = document.getElementById('categories');
-      if (!categories) return;
       var rowRect2 = rowEl.getBoundingClientRect();
       var viewH = window.innerHeight;
       var currentY = getTranslateY(categories);
@@ -72,6 +91,11 @@
         categories.style.transform = 'translateY(' + (currentY + (200 - rowRect2.top)) + 'px)';
       } else if (rowRect2.bottom > viewH - 100) {
         categories.style.transform = 'translateY(' + (currentY - (rowRect2.bottom - (viewH - 100))) + 'px)';
+      }
+    } else {
+      // Foco en hero/topbar → reset scroll de categorías
+      if (categories.style.transform) {
+        categories.style.transform = 'translateY(0)';
       }
     }
   }

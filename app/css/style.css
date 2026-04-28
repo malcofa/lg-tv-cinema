@@ -172,6 +172,13 @@ button {
   max-width: 900px;
   z-index: 10;
 }
+
+/* Cuando el foco baja a las filas de categorías, ocultamos el hero
+   para que no quede detrás de los títulos de fila ("Familia", "Acción"). */
+.hero.hero-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
 .hero-tagline {
   color: #e50914;
   font-weight: 700;
