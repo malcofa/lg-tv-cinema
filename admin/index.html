@@ -551,7 +551,7 @@
           <b>ID</b> TMDB o IMDb (<code>tt0013442</code>) ·
           o simplemente <b>el título</b>.
           <br>
-          <span style="color: #4ade80">📝 La sinopsis se traduce al español automáticamente.</span>
+          <span style="color: #4ade80">📝 La sinopsis se guarda en español.</span>
         </div>
         <div id="tmdb-results" class="tmdb-results"></div>
       </div>
@@ -1001,14 +1001,15 @@ const OMDb = (() => {
   async function selectById(imdbId) {
     const s = Settings.get();
     if (!s.omdb) throw new Error('OMDb key no configurada');
+    document.getElementById('tmdb-results').innerHTML = '<em style="color:#666">Cargando…</em>';
     const r = await fetch(base(s) + '&i=' + encodeURIComponent(imdbId) + '&plot=full');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     if (d.Response === 'False') throw new Error(d.Error || 'No encontrado');
-    Toast.ok('Cargado de OMDb: ' + d.Title + ' (traduciendo…)');
-    document.getElementById('tmdb-results').innerHTML = '';
+    // Espera a que TODO esté listo (incluyendo traducción) antes de mostrar resultado
     await fillFromOMDb(d);
-    Toast.ok('Cargado y traducido al español: ' + d.Title);
+    document.getElementById('tmdb-results').innerHTML = '';
+    Toast.ok('Cargado: ' + d.Title);
   }
 
   async function searchByTitle(title) {
@@ -1069,6 +1070,12 @@ const OMDb = (() => {
   async function fillFromOMDb(m) {
     const ok = v => v != null && v !== '' && v !== 'N/A';
     const setIf = (id, v) => { if (ok(v)) document.getElementById(id).value = v; };
+
+    // Traducir synopsis PRIMERO (espera el await), después pintamos todo el form
+    // de una sola vez con el texto ya en español. Así el usuario nunca ve inglés.
+    let plotEs = '';
+    if (ok(m.Plot)) plotEs = await translateToEs(m.Plot);
+
     setIf('f-title', m.Title);
     setIf('f-year', m.Year);
     const runtime = parseInt((m.Runtime || '').replace(/[^\d]/g, ''), 10);
@@ -1079,12 +1086,7 @@ const OMDb = (() => {
     if (ok(m.imdbRating)) setIf('f-rating', m.imdbRating);
     if (ok(m.Poster)) setIf('f-poster_url', m.Poster);
     if (ok(m.Genre)) TagsInput.setAll('genres', m.Genre.split(',').map(g => g.trim()).filter(Boolean));
-    // Traducimos el synopsis al final (es async). Si falla, queda el original.
-    if (ok(m.Plot)) {
-      setIf('f-synopsis', m.Plot); // primero el original, por si la API tarda
-      const translated = await translateToEs(m.Plot);
-      setIf('f-synopsis', translated);
-    }
+    if (plotEs) setIf('f-synopsis', plotEs);
   }
 
   return { selectById, searchByTitle, translateToEs };
