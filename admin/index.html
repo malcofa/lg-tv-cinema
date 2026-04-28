@@ -545,13 +545,10 @@
         </div>
         <div style="font-size:11px; color:var(--muted); margin-top:6px">
           Podés pegar:
-          <b>URL de TMDB</b> (<code>themoviedb.org/movie/1086260</code>) ·
-          <b>URL de IMDb</b> (<code>imdb.com/title/tt0013442</code>) ·
-          <b>URL de OMDb</b> (<code>omdbapi.com/?...&i=tt0013442</code>) ·
-          <b>ID</b> TMDB o IMDb (<code>tt0013442</code>) ·
-          o simplemente <b>el título</b>.
+          <b>el título</b> (autocomplete IMDb — incluso parcial: "eup" → Euphoria) ·
+          <b>URL de TMDB</b> · <b>URL de IMDb</b> · <b>URL de OMDb</b> · <b>ID</b> (numérico TMDB o <code>tt...</code> IMDb).
           <br>
-          <span style="color: #4ade80">📝 La sinopsis se guarda en español.</span>
+          <span style="color: #4ade80">📝 La sinopsis se guarda en español automáticamente.</span>
         </div>
         <div id="tmdb-results" class="tmdb-results"></div>
       </div>
@@ -918,7 +915,20 @@ const TMDB = (() => {
       return;
     }
 
-    // Búsqueda por título — TMDB primero, OMDb fallback
+    // Búsqueda por título — IMDb suggest primero (gratis, sin auth, partial-match)
+    box.innerHTML = '<em style="color:#666">Buscando en IMDb…</em>';
+    try {
+      const list = await IMDb.suggest(q);
+      if (list.length > 0) {
+        renderIMDbResults(list);
+        return;
+      }
+      // sin resultados de IMDb → fallback a TMDB/OMDb
+    } catch (e) {
+      console.warn('IMDb suggest falló:', e.message);
+    }
+
+    // Fallback: TMDB
     if (s.tmdb) {
       box.innerHTML = '<em style="color:#666">Buscando en TMDB...</em>';
       try {
@@ -926,17 +936,40 @@ const TMDB = (() => {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const d = await r.json();
         if (d.results && d.results.length > 0) { render(d.results); return; }
-        // sin resultados → seguir con OMDb si hay
       } catch (e) {
         if (!s.omdb) { box.innerHTML = `<em style="color:var(--danger)">TMDB: ${e.message}</em>`; return; }
-        // si hay OMDb, seguir
       }
     }
+    // Fallback: OMDb search
     if (s.omdb) {
       box.innerHTML = '<em style="color:#666">Buscando en OMDb...</em>';
       try { await OMDb.searchByTitle(q); }
       catch (e) { box.innerHTML = `<em style="color:var(--danger)">OMDb: ${e.message}</em>`; }
+    } else {
+      box.innerHTML = '<em style="color:#666">Sin resultados.</em>';
     }
+  }
+
+  /** Renderiza resultados de IMDb suggest. Click → OMDb.selectById (que traduce). */
+  function renderIMDbResults(list) {
+    const box = document.getElementById('tmdb-results');
+    box.innerHTML = '';
+    list.slice(0, 18).forEach(item => {
+      const d = document.createElement('div');
+      d.className = 'tmdb-result';
+      const poster = (item.i && item.i.imageUrl) || '';
+      const type = item.q || '';
+      const cast = item.s || '';
+      d.innerHTML = `
+        ${poster ? `<img src="${poster}" loading="lazy">` : '<div style="aspect-ratio:2/3;background:#222;display:flex;align-items:center;justify-content:center;color:#555">🎬</div>'}
+        <div class="info">
+          <div style="font-weight:700">${esc(item.l)}</div>
+          <div style="color:#888">${esc(item.y || '')}${type ? ' · ' + esc(type) : ''}</div>
+          ${cast ? '<div style="color:#666; font-size:11px; margin-top:2px">' + esc(cast) + '</div>' : ''}
+        </div>`;
+      d.onclick = () => OMDb.selectById(item.id).catch(e => Toast.err(e.message));
+      box.appendChild(d);
+    });
   }
 
   function render(list) {
@@ -995,6 +1028,26 @@ const TMDB = (() => {
 /* =================================================================
    OMDb — alternativa a TMDB (sin geo-block)
 ================================================================= */
+/* =================================================================
+   IMDb Suggest — autocomplete oficial de IMDb (gratis, sin auth)
+   Endpoint: https://v3.sg.media-imdb.com/suggestion/x/<query>.json
+   Acepta queries parciales ("eup" → Euphoria). CORS abierto.
+================================================================= */
+const IMDb = (() => {
+  async function suggest(query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    const url = 'https://v3.sg.media-imdb.com/suggestion/x/' +
+                encodeURIComponent(q) + '.json?includeVideos=0';
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('IMDb HTTP ' + r.status);
+    const d = await r.json();
+    // Filtramos solo títulos (id empieza con "tt"). Saltamos personas (nm...).
+    return (d.d || []).filter(it => it.id && it.id.indexOf('tt') === 0);
+  }
+  return { suggest };
+})();
+
 const OMDb = (() => {
   function base(s) { return 'https://www.omdbapi.com/?apikey=' + encodeURIComponent(s.omdb); }
 
