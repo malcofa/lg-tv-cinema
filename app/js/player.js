@@ -75,13 +75,46 @@
       } catch (e) {}
       video.classList.add('hidden');
       iframe.classList.remove('hidden');
-      iframe.src = movie.video_url;
-      iframe.onload = function() {
-        focusIframe();
-        setTimeout(focusIframe, 200);
-        setTimeout(focusIframe, 500);
-        setTimeout(focusIframe, 1000);
+
+      // Estrategia: usar contentWindow.location.replace cuando sea posible
+      // (evita acumular history entries del iframe). Si el iframe ya navegó
+      // a un origen externo (cross-origin), location.replace falla, así que
+      // caemos al src directo.
+      var loadUrl = function() {
+        try {
+          if (iframe.contentWindow && iframe.contentDocument) {
+            // contentDocument acceso → todavía same-origin (about:blank)
+            iframe.contentWindow.location.replace(movie.video_url);
+            return;
+          }
+        } catch (e) { /* cross-origin, fallback */ }
+        iframe.src = movie.video_url;
       };
+
+      // Reset a about:blank primero si veníamos de otro embed cross-origin.
+      // Esto restaura el contentWindow accesible para usar location.replace.
+      var currentSrc = iframe.getAttribute('src') || '';
+      if (currentSrc && currentSrc !== 'about:blank') {
+        iframe.onload = function() {
+          iframe.onload = null;
+          loadUrl();
+          iframe.onload = function() {
+            focusIframe();
+            setTimeout(focusIframe, 200);
+            setTimeout(focusIframe, 500);
+            setTimeout(focusIframe, 1000);
+          };
+        };
+        iframe.src = 'about:blank';
+      } else {
+        loadUrl();
+        iframe.onload = function() {
+          focusIframe();
+          setTimeout(focusIframe, 200);
+          setTimeout(focusIframe, 500);
+          setTimeout(focusIframe, 1000);
+        };
+      }
     } else {
       iframe.src = 'about:blank';
       iframe.classList.add('hidden');
