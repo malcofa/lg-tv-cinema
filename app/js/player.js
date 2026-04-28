@@ -36,13 +36,15 @@
   }
 
   /**
-   * Muestra el botón "Volver" y agenda su auto-ocultamiento.
-   * Se llama en cada interacción del usuario para mantenerlo visible.
+   * Muestra el botón "Volver". En modo embed se queda visible siempre porque
+   * el iframe captura el foco y nuestras teclas no llegan a este handler.
+   * En modo directo, auto-oculta tras 3s sin interacción.
    */
   function showBackBtn() {
     if (!backBtn) return;
     backBtn.classList.remove('back-hidden');
     if (backBtnTimer) clearTimeout(backBtnTimer);
+    if (mode === 'embed') return; // siempre visible en embed
     backBtnTimer = setTimeout(function() {
       if (backBtn) backBtn.classList.add('back-hidden');
     }, BACK_HIDE_MS);
@@ -81,11 +83,13 @@
       video.classList.add('hidden');
       iframe.classList.remove('hidden');
       iframe.src = movie.video_url;
-      // Cuando el iframe carga, le damos foco para que las teclas
-      // (Enter / Espacio) puedan llegar a su contenido y disparar play.
+      // Cuando el iframe carga, le damos foco. Después intentamos refocusarlo
+      // varias veces porque algunos players de TV se "comen" el primer focus.
       iframe.onload = function() {
-        try { iframe.focus(); } catch (e) {}
-        try { if (iframe.contentWindow) iframe.contentWindow.focus(); } catch (e) {}
+        focusIframe();
+        setTimeout(focusIframe, 200);
+        setTimeout(focusIframe, 500);
+        setTimeout(focusIframe, 1000);
       };
     } else {
       iframe.src = 'about:blank';
@@ -133,6 +137,25 @@
     } catch (e) {}
   }
 
+  function focusIframe() {
+    try { iframe.focus(); } catch (e) {}
+    try { if (iframe.contentWindow) iframe.contentWindow.focus(); } catch (e) {}
+  }
+
+  /** Intenta clickear al centro del iframe. Útil para algunos players
+   *  que SÍ aceptan eventos sintéticos en su elemento contenedor. */
+  function tryClickIframe() {
+    try {
+      var rect = iframe.getBoundingClientRect();
+      var cx = rect.left + rect.width / 2;
+      var cy = rect.top + rect.height / 2;
+      var evt = document.createEvent('MouseEvents');
+      evt.initMouseEvent('click', true, true, window, 1, cx, cy, cx, cy,
+        false, false, false, false, 0, null);
+      iframe.dispatchEvent(evt);
+    } catch (e) {}
+  }
+
   function handleKey(keyCode) {
     var K = global.Nav.KEY;
     // Cualquier tecla muestra el botón Volver
@@ -144,7 +167,13 @@
       return true;
     }
     if (mode === 'embed') {
-      // En embed dejamos pasar las demás teclas al iframe
+      // Refocus agresivo al iframe para que la próxima tecla llegue a su contenido.
+      // Si presionó Enter / Play, además intentamos click sintético al iframe
+      // (algunos players de terceros responden, otros no por CORS).
+      focusIframe();
+      if (keyCode === K.ENTER || keyCode === K.PLAY) {
+        tryClickIframe();
+      }
       return false;
     }
     if (keyCode === K.ENTER || keyCode === K.PAUSE || keyCode === K.PLAY) {
