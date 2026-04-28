@@ -15,6 +15,7 @@
 
   var video = document.getElementById('video');
   var iframe = document.getElementById('video-iframe');
+  var iframeParent = iframe ? iframe.parentNode : null;
   var overlay = document.getElementById('player-overlay');
   var titleEl = document.getElementById('player-title');
   var overlayTimer = null;
@@ -46,6 +47,29 @@
   function focusIframe() {
     try { iframe.focus(); } catch (e) {}
     try { if (iframe.contentWindow) iframe.contentWindow.focus(); } catch (e) {}
+  }
+
+  /**
+   * Recrea el elemento iframe desde cero. Necesario en webOS porque después
+   * de que el iframe captura el foco con contenido cross-origin, queda en un
+   * estado raro donde sigue rutéandose teclas a él aunque lo blureemos y
+   * lo escondamos. Reemplazar el elemento corta esa cadena.
+   */
+  function recreateIframe() {
+    if (!iframeParent) return;
+    var fresh = document.createElement('iframe');
+    fresh.id = 'video-iframe';
+    fresh.className = 'hidden';
+    fresh.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture; encrypted-media');
+    fresh.setAttribute('allowfullscreen', '');
+    fresh.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-forms');
+    fresh.setAttribute('referrerpolicy', 'no-referrer');
+    if (iframe && iframe.parentNode) {
+      iframe.parentNode.replaceChild(fresh, iframe);
+    } else {
+      iframeParent.appendChild(fresh);
+    }
+    iframe = fresh;
   }
 
   function tryClickIframe() {
@@ -137,16 +161,11 @@
       video.removeAttribute('src');
       video.load();
     } catch (e) {}
-    // Liberar el foco del iframe en el orden correcto:
-    // 1) blur explícito
-    // 2) cambiar src a blank
-    // 3) ocultarlo con display:none (saca al iframe del render/focus tree)
-    // 4) refocusar body como fallback
-    try { iframe.blur(); } catch (eB) {}
-    try { iframe.src = 'about:blank'; } catch (e2) {}
-    iframe.classList.add('hidden');
     video.classList.add('hidden');
-    try { document.body.focus(); } catch (e3) {}
+    // NUCLEAR: reemplazamos el elemento iframe entero. webOS deja focos colgados
+    // que no se limpian con blur/hidden/about:blank. Recrear desde cero corta
+    // toda relación con el iframe anterior y libera la captura de teclas.
+    recreateIframe();
     overlay.classList.remove('visible');
     if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
   }
